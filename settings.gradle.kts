@@ -6,7 +6,6 @@ val localProps = Properties().apply {
     val file = File(rootDir, "local.properties")
     if (file.exists()) load(FileInputStream(file))
 }
-val useLocalSkyWidgetCompose = localProps.getProperty("useLocalSkyWidgetCompose")?.toBooleanStrictOrNull() ?: false
 val useLocalSkyBuildLogic = localProps.getProperty("useLocalSkyBuildLogic")?.toBooleanStrictOrNull() ?: false
 
 pluginManagement {
@@ -72,7 +71,5 @@ rootProject.name = "SkyWidgetCompose"
 if (useLocalSkyBuildLogic) {
     includeBuild("/Users/henry/workProject/androidProject/lib/SkyBuildLogic/buildLogicLib")
 }
-if (useLocalSkyWidgetCompose) {
-    include(":SkyWidgetComposeLib")
-}
 include(":app")
+include(":SkyWidgetComposeLib")

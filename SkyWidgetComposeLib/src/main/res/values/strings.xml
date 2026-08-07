@@ -1,4 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="sky_rl_loading">正在加载</string>
+
+    <!-- SkyTimeRefreshHeader（Classics 风格）文案与时间格式 -->
+    <string name="sky_rl_header_pulling">下拉开始刷新</string>
+    <string name="sky_rl_header_release">释放立即刷新</string>
+    <string name="sky_rl_header_refreshing">正在刷新…</string>
+    <string name="sky_rl_header_finished">刷新完成</string>
+    <string name="sky_rl_header_secondary">释放进入二楼</string>
+    <string name="sky_rl_header_time_format">\'最后更新：\'M-d HH:mm</string>
 </resources>

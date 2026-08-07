@@ -1,8 +1,15 @@
 package com.sky.widget.sample
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,7 +23,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -28,6 +37,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,14 +46,25 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sky.widget.refresh.SkyRefreshFlag
 import com.sky.widget.refresh.SkyRefreshLayout
+import com.sky.widget.refresh.SkyRefreshState
+import com.sky.widget.refresh.SkyRefreshStyle
+import com.sky.widget.refresh.header.SkyBallRefreshHeader
+import com.sky.widget.refresh.header.SkyCircleRefreshHeader
+import com.sky.widget.refresh.header.SkyLottieRefreshHeader
+import com.sky.widget.refresh.header.SkyProgressRefreshHeader
+import com.sky.widget.refresh.header.SkyTimeRefreshHeader
+import com.sky.widget.refresh.header.SkyTwoLevelRefreshHeader
 import com.sky.widget.refresh.rememberSkyRefreshState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.milliseconds
 
 // ─────────────────────────────────────────────────────────────────────
 // 示例菜单
@@ -60,6 +81,13 @@ private val refreshDemoEntries = listOf(
     RefreshDemoEntry("横向滑动", "orientation = Orientation.Horizontal", Screen.Horizontal),
     RefreshDemoEntry("自定义指示器", "header / footer 插槽 + SkyRefreshFlag 状态驱动", Screen.CustomIndicator),
     RefreshDemoEntry("程序化触发", "autoRefresh() / autoLoadMore() / 开关动态切换", Screen.AutoTrigger),
+    RefreshDemoEntry("球状加载 Header", "库内置 SkyBallRefreshHeader（三球缩放动画）", Screen.BallHeader),
+    RefreshDemoEntry("Lottie Header", "库内置 SkyLottieRefreshHeader（Lottie 动画）", Screen.LottieHeader),
+    RefreshDemoEntry("FixedContent 样式", "内容固定 + SkyCircleRefreshHeader 圆圈滑入覆盖", Screen.FixedContent),
+    RefreshDemoEntry("FixedFront 样式", "辉光+进度条固定在前面，下拉进度填充", Screen.FixedFront),
+    RefreshDemoEntry("时间文案 Header", "SkyTimeRefreshHeader：箭头+状态文案+最后更新时间，文案/格式可同名资源覆盖", Screen.TimeHeader),
+    RefreshDemoEntry("下拉进入二楼", "secondFloorRate + onSecondFloor：拉过二级阈值松手打开二楼", Screen.SecondFloor),
+    RefreshDemoEntry("自定义二楼 Header", "不用库内组件：业务自定义 Header + 二楼进度渐变动画", Screen.CustomSecondFloor),
 )
 
 /**
@@ -136,9 +164,14 @@ private fun RefreshDemoScaffold(title: String, onBack: () -> Unit, content: @Com
 
 /** 纵向文字列表，各示例共用的内容主体。 */
 @Composable
-private fun DemoItemList(items: List<String>, modifier: Modifier = Modifier) {
+private fun DemoItemList(
+    items: List<String>,
+    modifier: Modifier = Modifier,
+    listState: LazyListState = rememberLazyListState()
+) {
     LazyColumn(
         modifier = modifier.fillMaxSize(),
+        state = listState,
         contentPadding = PaddingValues(vertical = 8.dp)
     ) {
         items(items, key = { it }) { text ->
@@ -171,7 +204,7 @@ fun OnlyRefreshDemoScreen(onBack: () -> Unit) {
             state = state,
             onRefresh = {
                 scope.launch {
-                    delay(1500)
+                    delay(1500.milliseconds)
                     items = items.shuffled()
                     state.finish()
                 }
@@ -198,7 +231,7 @@ fun LoadMoreOnlyDemoScreen(onBack: () -> Unit) {
             state = state,
             onLoadMore = {
                 scope.launch {
-                    delay(1500)
+                    delay(1500.milliseconds)
                     val appended = List(5) { "列表项 #${items.size + it + 1}" }
                     items = items + appended
                     state.finish(noMoreData = items.size >= 30)
@@ -212,7 +245,7 @@ fun LoadMoreOnlyDemoScreen(onBack: () -> Unit) {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// 示例：无终态提示（noMoreDataText 不传）
+// 示例 3：无终态提示（noMoreDataText 不传）
 // ─────────────────────────────────────────────────────────────────────
 
 @Composable
@@ -235,7 +268,7 @@ fun NoMoreHiddenDemoScreen(onBack: () -> Unit) {
                     state = state,
                     onLoadMore = {
                         scope.launch {
-                            delay(1500)
+                            delay(1500.milliseconds)
                             val appended = List(5) { "列表项 #${items.size + it + 1}" }
                             items = items + appended
                             state.finish(noMoreData = items.size >= 30)
@@ -251,7 +284,7 @@ fun NoMoreHiddenDemoScreen(onBack: () -> Unit) {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// 示例 3：阻尼系数（stickinessLevel）
+// 示例 4：阻尼系数（stickinessLevel）
 // ─────────────────────────────────────────────────────────────────────
 
 @Composable
@@ -297,7 +330,7 @@ fun StickinessDemoScreen(onBack: () -> Unit) {
                     state = state,
                     onRefresh = {
                         scope.launch {
-                            delay(1500)
+                            delay(1500.milliseconds)
                             items = items.shuffled()
                             state.finish()
                         }
@@ -311,7 +344,7 @@ fun StickinessDemoScreen(onBack: () -> Unit) {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// 示例 4：横向滑动（orientation = Horizontal）
+// 示例 5：横向滑动（orientation = Horizontal）
 // ─────────────────────────────────────────────────────────────────────
 
 @Composable
@@ -327,14 +360,14 @@ fun HorizontalRefreshDemoScreen(onBack: () -> Unit) {
             orientation = Orientation.Horizontal,
             onRefresh = {
                 scope.launch {
-                    delay(1500)
+                    delay(1500.milliseconds)
                     items = List(8) { "卡片 #${it + 1}" }
                     state.finish()
                 }
             },
             onLoadMore = {
                 scope.launch {
-                    delay(1500)
+                    delay(1500.milliseconds)
                     val appended = List(4) { "卡片 #${items.size + it + 1}" }
                     items = items + appended
                     state.finish(noMoreData = items.size >= 20)
@@ -364,7 +397,7 @@ fun HorizontalRefreshDemoScreen(onBack: () -> Unit) {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// 示例 5：自定义 Header / Footer
+// 示例 6：自定义 Header / Footer
 // ─────────────────────────────────────────────────────────────────────
 
 @Composable
@@ -425,14 +458,14 @@ fun CustomIndicatorDemoScreen(onBack: () -> Unit) {
             footer = { DemoCustomFooter(flag = state.loadMoreFlag, noMoreData = state.noMoreData) },
             onRefresh = {
                 scope.launch {
-                    delay(1500)
+                    delay(1500.milliseconds)
                     items = List(10) { "列表项 #${it + 1}" }
                     state.finish()
                 }
             },
             onLoadMore = {
                 scope.launch {
-                    delay(1500)
+                    delay(1500.milliseconds)
                     val appended = List(5) { "列表项 #${items.size + it + 1}" }
                     items = items + appended
                     state.finish(noMoreData = items.size >= 30)
@@ -445,7 +478,7 @@ fun CustomIndicatorDemoScreen(onBack: () -> Unit) {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// 示例 6：程序化触发（autoRefresh / autoLoadMore / 开关）
+// 示例 7：程序化触发（autoRefresh / autoLoadMore / 开关）
 // ─────────────────────────────────────────────────────────────────────
 
 @Composable
@@ -503,14 +536,14 @@ fun AutoTriggerDemoScreen(onBack: () -> Unit) {
                     state = state,
                     onRefresh = {
                         scope.launch {
-                            delay(1500)
+                            delay(1500.milliseconds)
                             items = List(10) { "列表项 #${it + 1}" }
                             state.finish()
                         }
                     },
                     onLoadMore = {
                         scope.launch {
-                            delay(1500)
+                            delay(1500.milliseconds)
                             val appended = List(5) { "列表项 #${items.size + it + 1}" }
                             items = items + appended
                             state.finish(noMoreData = items.size >= 30)
@@ -520,6 +553,347 @@ fun AutoTriggerDemoScreen(onBack: () -> Unit) {
                     DemoItemList(items)
                 }
             }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// 示例 8：球状加载 Header（库内置 SkyBallRefreshHeader，三球缩放动画效果）
+// ─────────────────────────────────────────────────────────────────────
+
+@Composable
+fun BallHeaderDemoScreen(onBack: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    val state = rememberSkyRefreshState(enableLoadMore = false)
+    val listState = rememberLazyListState()
+    var items by remember { mutableStateOf(List(20) { "列表项 #${it + 1}" }) }
+
+    // 必须等新数据重组应用后再回滚：在 onRefresh 里 shuffle 后立刻 scrollToItem，
+    // 会被重组时 LazyColumn 按 key 锚定首项的逻辑覆盖掉
+    LaunchedEffect(items) {
+        listState.scrollToItem(0)
+    }
+
+    RefreshDemoScaffold(title = "球状加载 Header", onBack = onBack) {
+        SkyRefreshLayout(
+            modifier = Modifier.fillMaxSize(),
+            state = state,
+            header = { SkyBallRefreshHeader(flag = state.refreshFlag) },
+            onRefresh = {
+                scope.launch {
+                    delay(1500.milliseconds)
+                    items = items.shuffled()
+                    state.finish()
+                }
+            }
+        ) {
+            DemoItemList(items, listState = listState)
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// 示例 9：Lottie Header（库内置 SkyLottieRefreshHeader，Lottie 动画效果）
+// ─────────────────────────────────────────────────────────────────────
+
+@Composable
+fun LottieHeaderDemoScreen(onBack: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    val state = rememberSkyRefreshState(enableLoadMore = false)
+    val listState = rememberLazyListState()
+    var items by remember { mutableStateOf(List(20) { "列表项 #${it + 1}" }) }
+
+    LaunchedEffect(items) {
+        listState.scrollToItem(0)
+    }
+
+    RefreshDemoScaffold(title = "Lottie Header", onBack = onBack) {
+        SkyRefreshLayout(
+            modifier = Modifier.fillMaxSize(),
+            state = state,
+            header = { SkyLottieRefreshHeader(flag = state.refreshFlag) },
+            onRefresh = {
+                scope.launch {
+                    delay(1500.milliseconds)
+                    items = items.shuffled()
+                    state.finish()
+                }
+            }
+        ) {
+            DemoItemList(items, listState = listState)
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// 示例 10：FixedContent 样式：
+// 下拉时内容固定不动，官方圆圈风格 Header（SkyCircleRefreshHeader）从顶部滑入并覆盖在内容之上
+// ─────────────────────────────────────────────────────────────────────
+
+@Composable
+fun FixedContentDemoScreen(onBack: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    val state = rememberSkyRefreshState(enableLoadMore = false)
+    val listState = rememberLazyListState()
+    var items by remember { mutableStateOf(List(20) { "列表项 #${it + 1}" }) }
+
+    LaunchedEffect(items) {
+        listState.scrollToItem(0)
+    }
+
+    RefreshDemoScaffold(title = "FixedContent 样式", onBack = onBack) {
+        SkyRefreshLayout(
+            modifier = Modifier.fillMaxSize(),
+            state = state,
+            style = SkyRefreshStyle.FixedContent,
+            header = { SkyCircleRefreshHeader(state) },
+            onRefresh = {
+                scope.launch {
+                    delay(1500.milliseconds)
+                    items = items.shuffled()
+                    state.finish()
+                }
+            }
+        ) {
+            DemoItemList(items, listState = listState)
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// 示例 11：FixedFront 样式：
+// 辉光+线性进度条 Header（SkyProgressRefreshHeader）固定在内容前方原位，
+// 下拉时位置不动，辉光渐入、进度条随下拉距离填充，刷新时变为无限滚动进度条
+// ─────────────────────────────────────────────────────────────────────
+
+@Composable
+fun FixedFrontDemoScreen(onBack: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    val state = rememberSkyRefreshState(enableLoadMore = false)
+    val listState = rememberLazyListState()
+    var items by remember { mutableStateOf(List(20) { "列表项 #${it + 1}" }) }
+
+    LaunchedEffect(items) {
+        listState.scrollToItem(0)
+    }
+
+    RefreshDemoScaffold(title = "FixedFront 样式", onBack = onBack) {
+        SkyRefreshLayout(
+            modifier = Modifier.fillMaxSize(),
+            state = state,
+            style = SkyRefreshStyle.FixedFront,
+            header = { SkyProgressRefreshHeader(state) },
+            onRefresh = {
+                scope.launch {
+                    delay(4000.milliseconds)
+                    items = items.shuffled()
+                    state.finish()
+                }
+            }
+        ) {
+            DemoItemList(items, listState = listState)
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// 示例 12：时间文案 Header（库内置 SkyTimeRefreshHeader）：
+// 箭头 + 状态文案 + 最后更新时间；文案与时间格式支持消费者同名资源覆盖
+// ─────────────────────────────────────────────────────────────────────
+
+@Composable
+fun TimeHeaderDemoScreen(onBack: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    val state = rememberSkyRefreshState(enableLoadMore = false)
+    val listState = rememberLazyListState()
+    var items by remember { mutableStateOf(List(20) { "列表项 #${it + 1}" }) }
+
+    LaunchedEffect(items) {
+        listState.scrollToItem(0)
+    }
+
+    RefreshDemoScaffold(title = "时间文案 Header", onBack = onBack) {
+        SkyRefreshLayout(
+            modifier = Modifier.fillMaxSize(),
+            state = state,
+            header = { SkyTimeRefreshHeader(state) },
+            onRefresh = {
+                scope.launch {
+                    delay(1500.milliseconds)
+                    items = items.shuffled()
+                    state.finish()
+                }
+            }
+        ) {
+            DemoItemList(items, listState = listState)
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// 示例 13：下拉进入二楼（参考 SmartRefreshLayout TwoLevelHeader）：
+// 下拉过刷新阈值显示“释放立即刷新”，继续拉过二级阈值（headerBound × 2）
+// 显示“释放进入二楼”，松手打开二楼覆盖层而不触发刷新
+// ─────────────────────────────────────────────────────────────────────
+
+/**
+ * 二楼覆盖层（各二楼示例共用）：进出场沿用下拉方向滑入/滑出，
+ * 根节点 clickable 消费触摸，防止穿透到底层列表误触发下拉。
+ */
+@Composable
+private fun DemoSecondFloorOverlay(open: Boolean, onClose: () -> Unit) {
+    AnimatedVisibility(
+        visible = open,
+        enter = slideInVertically(initialOffsetY = { -it }, animationSpec = tween(350)) + fadeIn(animationSpec = tween(350)),
+        exit = slideOutVertically(targetOffsetY = { -it }, animationSpec = tween(300)) + fadeOut(animationSpec = tween(300))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0xFF1B2431))
+                .clickable(
+                    indication = null,
+                    interactionSource = remember { MutableInteractionSource() }
+                ) { },
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(text = "欢迎来到二楼", fontSize = 22.sp, color = Color.White, fontWeight = FontWeight.Medium)
+            Text(
+                text = "这里是业务自定义的二楼内容（活动页 / 广告位 / 小游戏…）",
+                fontSize = 13.sp,
+                color = Color(0xFF9AA3B2),
+                modifier = Modifier.padding(top = 8.dp)
+            )
+            Button(
+                onClick = onClose,
+                modifier = Modifier.padding(top = 24.dp)
+            ) {
+                Text(text = "返回一楼")
+            }
+        }
+    }
+}
+
+@Composable
+fun SecondFloorDemoScreen(onBack: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    val state = rememberSkyRefreshState(enableLoadMore = false)
+    val listState = rememberLazyListState()
+    var items by remember { mutableStateOf(List(20) { "列表项 #${it + 1}" }) }
+    var secondFloorOpen by remember { mutableStateOf(false) }
+
+    LaunchedEffect(items) {
+        listState.scrollToItem(0)
+    }
+
+    RefreshDemoScaffold(title = "下拉进入二楼", onBack = onBack) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            SkyRefreshLayout(
+                modifier = Modifier.fillMaxSize(),
+                state = state,
+                secondFloorRate = 2f,
+                onSecondFloor = { secondFloorOpen = true },
+                header = { SkyTwoLevelRefreshHeader(state, secondFloorRate = 2f) },
+                onRefresh = {
+                    scope.launch {
+                        delay(1500.milliseconds)
+                        items = items.shuffled()
+                        state.finish()
+                    }
+                }
+            ) {
+                DemoItemList(items, listState = listState)
+            }
+
+            DemoSecondFloorOverlay(open = secondFloorOpen, onClose = { secondFloorOpen = false })
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// 示例 14：自定义 Header 实现下拉进二楼（不使用库内 SkyTwoLevelRefreshHeader）。
+//
+// 要点：二楼触发逻辑在容器层（secondFloorRate + onSecondFloor），与 Header 解耦；
+// 自定义 Header 只需：1) 自声明主轴高度（即刷新阈值）；2) 内部不做位移；
+// 3) 用 state.indicatorOffset 与「自身高度 × rate」比较，自行切换“释放进入二楼”提示。
+// headerBound 为库 internal（模块外不可读），但阈值恒等于自身声明的高度，自行换算即可。
+// ─────────────────────────────────────────────────────────────────────
+
+private val CustomFloorHeaderHeight = 64.dp
+private const val CustomSecondFloorRate = 2f
+
+/** 业务自定义的二楼 Header：背景浓度、字号、字重随“二楼进度”渐变。 */
+@Composable
+private fun DemoCustomFloorHeader(state: SkyRefreshState) {
+    val headerHeightPx = with(LocalDensity.current) { CustomFloorHeaderHeight.toPx() }
+    val offset = state.indicatorOffset.coerceAtLeast(0f)
+    val flag = state.refreshFlag
+    val overTrigger = offset >= headerHeightPx
+    val overSecondFloor = offset >= headerHeightPx * CustomSecondFloorRate
+    // 0~1 的二楼进度，用于驱动渐变动画
+    val floorProgress = (offset / (headerHeightPx * CustomSecondFloorRate)).coerceIn(0f, 1f)
+
+    val text = when {
+        flag == SkyRefreshFlag.REFRESHING -> "正在刷新…"
+        overSecondFloor -> "松手进入二楼！"
+        overTrigger -> "松手刷新，继续下拉进二楼"
+        else -> "下拉开始刷新"
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(CustomFloorHeaderHeight)
+            .background(Color(0xFF673AB7).copy(alpha = 0.08f + 0.5f * floorProgress)),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            fontSize = (14 + 4 * floorProgress).sp,
+            color = if (overSecondFloor) Color.White else Color(0xFF673AB7),
+            fontWeight = if (overSecondFloor) FontWeight.Bold else FontWeight.Normal,
+            modifier = Modifier.graphicsLayer {
+                val scale = 0.85f + 0.15f * floorProgress
+                scaleX = scale
+                scaleY = scale
+            }
+        )
+    }
+}
+
+@Composable
+fun CustomSecondFloorDemoScreen(onBack: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    val state = rememberSkyRefreshState(enableLoadMore = false)
+    val listState = rememberLazyListState()
+    var items by remember { mutableStateOf(List(20) { "列表项 #${it + 1}" }) }
+    var secondFloorOpen by remember { mutableStateOf(false) }
+
+    LaunchedEffect(items) {
+        listState.scrollToItem(0)
+    }
+
+    RefreshDemoScaffold(title = "自定义二楼 Header", onBack = onBack) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            SkyRefreshLayout(
+                modifier = Modifier.fillMaxSize(),
+                state = state,
+                secondFloorRate = CustomSecondFloorRate,
+                onSecondFloor = { secondFloorOpen = true },
+                header = { DemoCustomFloorHeader(state) },
+                onRefresh = {
+                    scope.launch {
+                        delay(1500.milliseconds)
+                        items = items.shuffled()
+                        state.finish()
+                    }
+                }
+            ) {
+                DemoItemList(items, listState = listState)
+            }
+
+            DemoSecondFloorOverlay(open = secondFloorOpen, onClose = { secondFloorOpen = false })
         }
     }
 }

@@ -36,10 +36,12 @@ android {
 dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material.icons.extended)
+    // 库的 SkyLottieRefreshHeader 为 compileOnly 依赖 Lottie，使用方需自行导包
+    implementation(libs.lottie.compose)
     if (useLocalSkyWidgetCompose) {
         implementation(project(":SkyWidgetComposeLib"))
     } else {
-
+        implementation(libs.skyWidgetCompose)
     }
 
 }

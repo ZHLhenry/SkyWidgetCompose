@@ -117,9 +117,17 @@ class SkyRefreshState(
     // ─────────────────────────────────────────────────────────────────────
     // 【视口解耦与增量渲染架构】
     //
-    // 在异步加载新数据时，为保障用户的滚动坐标系不发生跳跃，必须实现视口的解耦分离。
-    // 允许 Content 驻留在当前可视层级（decoupledContentOffset），同时外层容器
-    // 挂载点（indicatorOffset）继续延伸，以承载新装载的数据节点。
+    // 问题场景：上拉加载完成后，新数据追加到列表底部。如果直接移除 Footer，
+    // 列表内容会突然上跳，导致用户当前查看的位置丢失。
+    //
+    // 解决方案：视口解耦分离。
+    // - isContentOffsetDecoupled：标记 Content 是否处于解耦驻留状态
+    // - decoupledContentOffset：Content 驻留时的物理平移量（锁定值）
+    // - indicatorOffset：外层容器挂载点的偏移量（继续延伸以承载新数据）
+    //
+    // 数学关系：H + addedHeight + decoupledContentOffset == H + indicatorOffset
+    // 由此推导出 addedHeight = indicatorOffset - decoupledContentOffset，
+    // 用于动态扩展 Content 的物理渲染空间，实现新数据的无缝衔接。
     // ─────────────────────────────────────────────────────────────────────
 
     var isContentOffsetDecoupled by mutableStateOf(false)
@@ -129,19 +137,27 @@ class SkyRefreshState(
         internal set
 
     /**
-     * 增量物理空间计算属性。
+     * 增量物理空间计算属性（仅在解耦驻留时有效）。
      *
      * 通过恒等式：`H + addedHeight + decoupledContentOffset == H + indicatorOffset`
      * 推导出边界扩容公式：`addedHeight = indicatorOffset - decoupledContentOffset`。
      *
      * 该计算属性采用 `derivedStateOf` 封装，有效阻隔了由于高频位移导致的重绘渗透，
      * 仅当差值（物理边界）发生实质改变时，才触发 Compose 引擎的重测量。
+     *
+     * 使用场景：上拉加载完成后，Footer 瞬间移除，新数据需要额外的物理空间来填充。
      */
     val addedHeight: Int by derivedStateOf {
         if (!isContentOffsetDecoupled) 0
         else (indicatorOffset - decoupledContentOffset).coerceAtLeast(0f).roundToInt()
     }
 
+    /**
+     * Content 当前的实际渲染偏移量。
+     *
+     * 解耦驻留时返回锁定的 [decoupledContentOffset]（Content 保持静止），
+     * 否则返回 [indicatorOffset]（Content 跟随容器偏移）。
+     */
     val currentContentOffset: Float
         get() {
             if (!isContentOffsetDecoupled) return indicatorOffset
@@ -177,6 +193,21 @@ class SkyRefreshState(
     internal suspend fun snapOffsetTo(target: Float) {
         _anim.snapTo(target)
         indicatorOffset = target
+    }
+
+    /**
+     * 进入二楼：Header 平滑回弹隐藏，**不触发刷新回调**。
+     * 松手时偏移越过二级阈值（headerBound × secondFloorRate）时由连接层调用。
+     */
+    internal suspend fun enterSecondFloor() {
+        refreshFlag = SkyRefreshFlag.FINISHING
+        try {
+            animateOffsetTo(0f)
+        } finally {
+            // try/finally 兜底：即使回弹动画被并发 snapTo 取消，也必须回到 IDLE，
+            // 否则 refreshFlag 卡在 FINISHING 将导致后续永远无法下拉
+            refreshFlag = SkyRefreshFlag.IDLE
+        }
     }
 
     /**

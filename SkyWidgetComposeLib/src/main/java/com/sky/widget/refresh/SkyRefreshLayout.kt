@@ -1,48 +1,24 @@
 package com.sky.widget.refresh
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layoutId
-import androidx.compose.ui.res.colorResource
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.sky.widget.R
+import com.sky.widget.refresh.footer.SkyClassicsRefreshFooter
+import com.sky.widget.refresh.header.SkyClassicsRefreshHeader
 
 /**
- * 核心刷新容器核心层（基于原生 Layout 与硬件加速的复合渲染引擎）。
+ * 核心刷新容器（基于原生 Layout 与硬件加速的复合渲染引擎）。
  *
  * 作为一个具备泛用性与极简状态机的高级嵌套滑动容器，其核心架构特性如下：
  * 1. **多维排版兼容**：通过 [Orientation] 动态重定向约束与平移向量，完美支持纵向（Vertical）与横向（Horizontal）的滚动场景。
@@ -51,15 +27,24 @@ import com.sky.widget.R
  * 3. **纯净硬件加速**：摒弃传统改变约束导致的高频 UI 重排（Relayout），全程依靠 [graphicsLayer] 的图层平移
  *    处理交互位移，将 CPU 开销降至极低，实现零卡顿的顺滑手势跟随。
  * 4. **预布局防闪动**：在底层的 [Layout] 测量阶段优先对首尾装饰层完成布局测量，彻底消除首帧渲染时的组件闪烁问题。
+ * 5. **三层结构设计**：Header / Content / Footer 三层独立测量与放置，通过 [layoutId] 精准识别，
+ *    支持灵活的样式切换（[SkyRefreshStyle]）而不影响内部布局逻辑。
  *
  * @param modifier 外部修饰符
  * @param state 核心状态机引擎，控制并追踪当前的阻尼平移量与生命周期状态
  * @param orientation 排版方向。决定了手势拦截的作用轴以及 Header/Footer 的挂载方位
+ * @param style 位移样式 [SkyRefreshStyle]：默认 [SkyRefreshStyle.Translate] 内容跟随；
+ * [SkyRefreshStyle.FixedContent] 时下拉刷新侧内容固定、Header 滑入覆盖；
+ * [SkyRefreshStyle.FixedFront] 时 Header 固定悬浮在内容顶层原位，下拉仅驱动 Header 内部动画
  * @param onRefresh 下拉刷新（或向右拖拽）触发的异步回调
  * @param onLoadMore 上拉加载（或向左拖拽）触发的异步回调
+ * @param secondFloorRate 二楼触发倍率：> 0 时启用“下拉进入二楼”，
+ * 松手偏移超过 `headerBound × secondFloorRate` 则触发 [onSecondFloor] 而非刷新；默认 0 关闭
+ * @param onSecondFloor 进入二楼回调（参考 SmartRefreshLayout TwoLevelHeader），
+ * 由业务层自行展示二楼内容（覆盖层/跳转等）；为 null 时二楼不生效
  * @param noMoreDataText 业务层定制的“无更多数据”文案；**不传则终态不展示任何提示 UI**
- * @param header 自定义头部渲染器，默认提供了一个标准的旋转指示器 [SkyRefreshHeader]
- * @param footer 自定义尾部渲染器，默认提供了一个具备数据穷尽停靠特效的 [SkyRefreshFooter]
+ * @param header 自定义头部渲染器，默认提供了一个标准的旋转指示器 [SkyClassicsRefreshHeader]
+ * @param footer 自定义尾部渲染器，默认提供了一个具备数据穷尽停靠特效的 [SkyClassicsRefreshFooter]
  * @param content 支持嵌套滚动事件分发的内容主体
  */
 @Composable
@@ -67,12 +52,15 @@ fun SkyRefreshLayout(
     modifier: Modifier = Modifier,
     state: SkyRefreshState,
     orientation: Orientation = Orientation.Vertical,
+    style: SkyRefreshStyle = SkyRefreshStyle.Translate,
     onRefresh: (() -> Unit)? = null,
     onLoadMore: (() -> Unit)? = null,
+    secondFloorRate: Float = 0f,
+    onSecondFloor: (() -> Unit)? = null,
     noMoreDataText: String? = null,
-    header: @Composable () -> Unit = { SkyRefreshHeader(flag = state.refreshFlag, orientation = orientation) },
+    header: @Composable () -> Unit = { SkyClassicsRefreshHeader(flag = state.refreshFlag, orientation = orientation) },
     footer: @Composable () -> Unit = {
-        SkyRefreshFooter(
+        SkyClassicsRefreshFooter(
             flag = state.loadMoreFlag,
             noMoreData = state.noMoreData,
             orientation = orientation,
@@ -88,7 +76,7 @@ fun SkyRefreshLayout(
         val containerSize = if (isVertical) constraints.maxHeight else constraints.maxWidth
 
         // 绑定无状态耦合的嵌套滑动连接器
-        val connection = remember(state, orientation, containerSize, scope, onRefresh, onLoadMore) {
+        val connection = remember(state, orientation, containerSize, scope, onRefresh, onLoadMore, secondFloorRate, onSecondFloor) {
             // 将业务回调注入状态机，供 autoRefresh / autoLoadMore 程序化触发时派发
             state.refreshAction = { onRefresh?.invoke() }
             state.loadMoreAction = { onLoadMore?.invoke() }
@@ -98,7 +86,9 @@ fun SkyRefreshLayout(
                 containerSize = containerSize,
                 scope = scope,
                 onRefresh = { onRefresh?.invoke() },
-                onLoadMore = { onLoadMore?.invoke() }
+                onLoadMore = { onLoadMore?.invoke() },
+                secondFloorRate = secondFloorRate,
+                onSecondFloor = onSecondFloor
             )
         }
 
@@ -149,6 +139,18 @@ fun SkyRefreshLayout(
 
             val contentPlaceable = measurables.first { it.layoutId == "content" }.measure(contentConstraints)
 
+            // FixedContent / FixedFront 样式：下拉刷新侧（正偏移）内容固定不动，
+            // 上拉加载侧（负偏移）保持原有的跟随/解耦行为；
+            // Header 放置顺序在 Content 之后，天然绘制在其上层，形成滑入覆盖效果
+            val contentFixed = style != SkyRefreshStyle.Translate
+            val contentOffset = if (contentFixed) {
+                state.currentContentOffset.coerceAtMost(0f)
+            } else {
+                state.currentContentOffset
+            }
+            // FixedFront 样式：Header 固定在容器边缘原位（绘制在 Content 上层），不随偏移滑入
+            val headerFixed = style == SkyRefreshStyle.FixedFront
+
             layout(constraints.maxWidth, constraints.maxHeight) {
                 if (isVertical) {
                     val cxHeader = (constraints.maxWidth - headerPlaceable.width) / 2
@@ -156,10 +158,13 @@ fun SkyRefreshLayout(
 
                     // Content 应用可能被解耦的平移量
                     contentPlaceable.placeWithLayer(0, 0) {
-                        translationY = state.currentContentOffset
+                        translationY = contentOffset
                     }
-                    headerPlaceable.placeWithLayer(x = cxHeader, y = -headerPlaceable.height) {
-                        translationY = state.indicatorOffset
+                    headerPlaceable.placeWithLayer(
+                        x = cxHeader,
+                        y = if (headerFixed) 0 else -headerPlaceable.height
+                    ) {
+                        translationY = if (headerFixed) 0f else state.indicatorOffset
                     }
                     // 永远置于真实的屏幕底部，配合 indicatorOffset 平移
                     footerPlaceable.placeWithLayer(x = cxFooter, y = constraints.maxHeight) {
@@ -170,179 +175,17 @@ fun SkyRefreshLayout(
                     val cyFooter = (constraints.maxHeight - footerPlaceable.height) / 2
 
                     contentPlaceable.placeWithLayer(0, 0) {
-                        translationX = state.currentContentOffset
+                        translationX = contentOffset
                     }
-                    headerPlaceable.placeWithLayer(x = -headerPlaceable.width, y = cyHeader) {
-                        translationX = state.indicatorOffset
+                    headerPlaceable.placeWithLayer(
+                        x = if (headerFixed) 0 else -headerPlaceable.width,
+                        y = cyHeader
+                    ) {
+                        translationX = if (headerFixed) 0f else state.indicatorOffset
                     }
                     footerPlaceable.placeWithLayer(x = constraints.maxWidth, y = cyFooter) {
                         translationX = state.indicatorOffset
                     }
-                }
-            }
-        }
-    }
-}
-
-/**
- * 默认头部指示器（根据排版方向自适应宽高分配）
- *
- * @param flag 当前头部刷新状态机标记
- * @param orientation 整体容器的滚动方向
- */
-@Composable
-fun SkyRefreshHeader(flag: SkyRefreshFlag, orientation: Orientation = Orientation.Vertical) {
-    Box(
-        modifier = Modifier.let {
-            if (orientation == Orientation.Vertical) it.fillMaxWidth().height(50.dp)
-            else it.fillMaxHeight().width(50.dp)
-        }
-    ) {
-        // 无限动画过渡，驱动 Loading 的持续旋转
-        val refreshAnimate by rememberInfiniteTransition(label = "SkyRefreshHeader").animateFloat(
-            initialValue = 0f,
-            targetValue = 360f,
-            animationSpec = infiniteRepeatable(tween(800, easing = LinearEasing)),
-            label = "rotate"
-        )
-        Image(
-            painter = painterResource(id = R.drawable.icon_refresh_loading),
-            contentDescription = null,
-            modifier = Modifier
-                .align(Alignment.Center)
-                .size(20.dp)
-                // 仅在明确进行刷新动作时触发旋转
-                .rotate(if (flag == SkyRefreshFlag.REFRESHING) refreshAnimate else 0f)
-        )
-    }
-}
-
-/**
- * 默认尾部指示器（承载“没有更多了”的原生跟手交互底座）
- *
- * @param flag 当前尾部加载状态机标记
- * @param noMoreData 是否已经没有更多数据
- * @param orientation 整体容器的滚动方向
- * @param noMoreText 定制版“没有更多数据”文案；为 null 时终态整体不渲染
- */
-@Composable
-fun SkyRefreshFooter(
-    flag: SkyRefreshFlag,
-    noMoreData: Boolean,
-    orientation: Orientation = Orientation.Vertical,
-    noMoreText: String? = null
-) {
-    // 未传入“无更多数据”文案时，终态整体不渲染（零尺寸，footerBound 归零），
-    // 末尾拉出与停靠交互随之自然失效
-    if (noMoreData && noMoreText == null) {
-        Box(modifier = Modifier)
-        return
-    }
-    val displayNoMoreText = noMoreText.orEmpty()
-
-    if (orientation == Orientation.Vertical) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                // 经典悬停特性：即便 noMoreData 为 true 也强制保持有效尺寸。
-                // 这确保了它可以随着用户在底部的惯性滑动被完美拉出，并吸附在视野中。
-                .height(50.dp)
-        ) {
-            if (noMoreData) {
-                // 无更多数据：静态提示模式
-                Row(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Text(
-                        text = displayNoMoreText,
-                        fontSize = 12.sp,
-                        color = colorResource(R.color.sky_rl_text_tertiary),
-                        textAlign = TextAlign.Center
-                    )
-                }
-            } else {
-                // 加载中：动效提示模式
-                val refreshAnimate by rememberInfiniteTransition(label = "SkyRefreshFooter").animateFloat(
-                    initialValue = 0f,
-                    targetValue = 360f,
-                    animationSpec = infiniteRepeatable(tween(500, easing = LinearEasing)),
-                    label = "SkyRefreshFooter"
-                )
-                Row(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.icon_load_more_loading),
-                        contentDescription = null,
-                        modifier = Modifier
-                            .size(16.dp)
-                            .rotate(if (flag == SkyRefreshFlag.REFRESHING) refreshAnimate else 0f)
-                    )
-                    Column(modifier = Modifier.padding(start = 8.dp)) {
-                        Text(
-                            text = stringResource(R.string.sky_rl_loading),
-                            fontSize = 14.sp,
-                            color = colorResource(R.color.sky_rl_text_title),
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
-            }
-        }
-    } else {
-        // 横向布局逻辑，高度撑满，主轴宽度定宽
-        Box(
-            modifier = Modifier
-                .fillMaxHeight()
-                .width(50.dp)
-        ) {
-            if (noMoreData) {
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    val verticalText = displayNoMoreText.map { it.toString() }.joinToString("\n")
-                    Text(
-                        text = verticalText,
-                        fontSize = 12.sp,
-                        color = colorResource(R.color.sky_rl_text_tertiary),
-                        lineHeight = 16.sp,
-                        textAlign = TextAlign.Center
-                    )
-                }
-            } else {
-                val refreshAnimate by rememberInfiniteTransition(label = "SkyRefreshFooter").animateFloat(
-                    initialValue = 0f,
-                    targetValue = 360f,
-                    animationSpec = infiniteRepeatable(tween(500, easing = LinearEasing)),
-                    label = "SkyRefreshFooter"
-                )
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.icon_load_more_loading),
-                        contentDescription = null,
-                        modifier = Modifier
-                            .size(16.dp)
-                            .rotate(if (flag == SkyRefreshFlag.REFRESHING) refreshAnimate else 0f)
-                    )
-                    val verticalLoadingText = stringResource(R.string.sky_rl_loading).map { it.toString() }.joinToString("\n")
-                    Text(
-                        text = verticalLoadingText,
-                        fontSize = 14.sp,
-                        color = colorResource(R.color.sky_rl_text_title),
-                        modifier = Modifier.padding(top = 8.dp),
-                        lineHeight = 18.sp,
-                        textAlign = TextAlign.Center
-                    )
                 }
             }
         }

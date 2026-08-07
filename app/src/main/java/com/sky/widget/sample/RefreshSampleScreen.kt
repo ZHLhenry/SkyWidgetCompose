@@ -36,6 +36,7 @@ import com.sky.widget.refresh.SkyRefreshLayout
 import com.sky.widget.refresh.rememberSkyRefreshState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * 刷新组件完整用法示例页面。
@@ -86,14 +87,14 @@ fun RefreshSampleScreen(onBack: () -> Unit) {
             onRefresh = {
                 android.util.Log.d("RefreshSample", "onRefresh triggered, refreshFlag=${state.refreshFlag}")
                 scope.launch {
-                    delay(3000)
+                    delay(3000.milliseconds)
                     items = List(15) { "列表项 #${it + 1}" }
                     state.finish()
                 }
             },
             onLoadMore = {
                 scope.launch {
-                    delay(3000)
+                    delay(3000.milliseconds)
                     if (items.size >= 45) {
                         state.finish(noMoreData = true)
                     } else {

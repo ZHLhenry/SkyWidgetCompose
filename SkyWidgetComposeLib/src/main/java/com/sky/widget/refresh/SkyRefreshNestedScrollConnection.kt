@@ -8,10 +8,10 @@ import androidx.compose.ui.unit.Velocity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
-/** Fling 拉出 Header 时相对手指主动拖拽使用的阻尼倍率，降低轻微回滑触发刷新的概率。 */
+/** 惯性滚动（Fling）拉出 Header 时相对手指主动拖拽使用的阻尼倍率，降低轻微回滑触发刷新的概率。 */
 private const val HEADER_FLING_STICKINESS_RATIO = 0.3f
 
-/** 单次 Fling 最多允许前 5 帧拉出 Header，避免后续低速惯性造成 Header 缓慢爬出。 */
+/** 单次惯性滚动最多允许前 5 帧拉出 Header，避免后续低速惯性造成 Header 缓慢爬出。 */
 private const val MAX_HEADER_FLING_CONSUME_FRAMES = 5
 
 /**
@@ -32,7 +32,9 @@ internal class SkyRefreshNestedScrollConnection(
     private val containerSize: Int,
     private val scope: CoroutineScope,
     private val onRefresh: () -> Unit,
-    private val onLoadMore: () -> Unit
+    private val onLoadMore: () -> Unit,
+    private val secondFloorRate: Float = 0f,
+    private val onSecondFloor: (() -> Unit)? = null
 ) : NestedScrollConnection {
 
     /** 单次 Fling 中已用于拉出 Header 的帧数，在 Fling 开始和结束时复位。 */
@@ -47,7 +49,14 @@ internal class SkyRefreshNestedScrollConnection(
 
     /**
      * 第一防线：在子视图（如列表）滚动**之前**触发。
-     * 主要目的是：如果容器目前处于被拉开的状态，用户反向推动列表时，我们应该优先把偏移的容器推回原位，而不是让列表自己内部滚动。
+     *
+     * 主要目的是：如果容器目前处于被拉开的状态（Header/Footer 已越界），
+     * 用户反向推动列表时，我们应该优先把偏移的容器推回原位，而不是让列表自己内部滚动。
+     *
+     * 处理逻辑：
+     * - Header 已拉出 + 用户上推 → 优先收起 Header（带阻尼）
+     * - Footer 已拉出 + 用户下推 → 优先收起 Footer（1:1 线性跟手）
+     * - Content 处于解耦驻留 + 用户下推 → 继续收起 Content 直至归位
      */
     override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
         val availableAxis = available.mainAxis()
@@ -95,7 +104,14 @@ internal class SkyRefreshNestedScrollConnection(
 
     /**
      * 第二防线：在子视图滚动**到底/到顶**，并且产生了未消耗的溢出位移时触发。
-     * 主要目的是：把溢出的、无法被列表消费的滚动力量转化为对外部容器的“拉扯阻尼拉长”效果。
+     *
+     * 主要目的是：把溢出的、无法被列表消费的滚动力量转化为对外部容器的"拉扯阻尼拉长"效果。
+     *
+     * 处理逻辑：
+     * - 列表到顶 + 用户继续下拉 → 拉出 Header（带阻尼，惯性滚动有帧数限制）
+     * - 列表到底 + 用户继续上拉 → 拉出 Footer（1:1 线性跟手，完全可见时触发加载）
+     *
+     * 互斥约束：下拉刷新与上拉加载不能同时进行，一方处于 REFRESHING 时另一方被禁止。
      */
     override fun onPostScroll(
         consumed: Offset,
@@ -107,13 +123,13 @@ internal class SkyRefreshNestedScrollConnection(
             // 列表到达了顶部，用户还在使劲往下拉（开始拉出 Header）
             // 互斥约束：上拉加载执行期间（REFRESHING），禁止拉出 Header
             availableAxis > 0 && state.enableRefresh && state.headerBound > 0f && state.refreshFlag != SkyRefreshFlag.FINISHING && state.loadMoreFlag != SkyRefreshFlag.REFRESHING -> {
-                if (source == NestedScrollSource.Fling && headerFlingConsumedFrames >= MAX_HEADER_FLING_CONSUME_FRAMES) {
+                if (source == NestedScrollSource.SideEffect && headerFlingConsumedFrames >= MAX_HEADER_FLING_CONSUME_FRAMES) {
                     return Offset.Zero
                 }
                 // 计算当前容许的最大形变边界。Fling 代表系统惯性滚动。
-                val limit = if (source == NestedScrollSource.Fling) state.headerBound else containerSize / 2f
+                val limit = if (source == NestedScrollSource.SideEffect) state.headerBound else containerSize / 2f
                 // Fling 只消费前几帧，保留短促的惯性反馈，避免 Header 随后续帧缓慢爬出。
-                val stickiness = if (source == NestedScrollSource.Fling) {
+                val stickiness = if (source == NestedScrollSource.SideEffect) {
                     state.stickinessLevel * HEADER_FLING_STICKINESS_RATIO
                 } else {
                     state.stickinessLevel
@@ -127,11 +143,11 @@ internal class SkyRefreshNestedScrollConnection(
                         state.loadMoreFlag = SkyRefreshFlag.IDLE
                     }
                 }
-                if (source == NestedScrollSource.Fling) {
+                if (source == NestedScrollSource.SideEffect) {
                     headerFlingConsumedFrames++
                 }
                 // 极端情况防御：如果是系统强劲的惯性滚到了顶部并且直接飞出阈值，直接触发刷新回调
-                if (source == NestedScrollSource.Fling && state.indicatorOffset >= state.headerBound && state.refreshFlag != SkyRefreshFlag.REFRESHING) {
+                if (source == NestedScrollSource.SideEffect && state.indicatorOffset >= state.headerBound && state.refreshFlag != SkyRefreshFlag.REFRESHING) {
                     state.refreshFlag = SkyRefreshFlag.REFRESHING
                     state.indicatorOffset = state.headerBound
                     onRefresh()
@@ -174,7 +190,15 @@ internal class SkyRefreshNestedScrollConnection(
 
     /**
      * 手指离开屏幕产生滑动惯性（Fling）前的最后一道拦截。
-     * 主要目的是：判断当前越界程度是否满足刷新要求。如果是，拦截该惯性并在悬停位执行动画，同时消费该手势的动能以避免内部列表失控漂移。
+     *
+     * 主要目的是：判断当前越界程度是否满足刷新/加载/二楼触发条件。
+     * 如果是，拦截该惯性并在悬停位执行动画，同时消费该手势的动能以避免内部列表失控漂移。
+     *
+     * 处理逻辑：
+     * - 已处于 REFRESHING → 停靠在阈值处
+     * - 越过 Header 阈值 → 触发刷新或进入二楼
+     * - 越过 Footer 阈值 → 触发上拉加载
+     * - noMoreData 终态 → 根据甩动方向决定停靠或收起
      */
     override suspend fun onPreFling(available: Velocity): Velocity {
         headerFlingConsumedFrames = 0
@@ -204,9 +228,18 @@ internal class SkyRefreshNestedScrollConnection(
         return when {
             // 情境2：用户用力拉过了 Header 的阈值，松手 -> 开始真正意义上的刷新
             headerOver && state.refreshFlag != SkyRefreshFlag.FINISHING -> {
-                state.refreshFlag = SkyRefreshFlag.REFRESHING
-                scope.launch { state.animateOffsetTo(state.headerBound) }
-                onRefresh()
+                if (onSecondFloor != null && secondFloorRate > 0f && offset >= state.headerBound * secondFloorRate) {
+                    // 越过二级阈值：进入二楼，Header 回弹隐藏，不触发刷新。
+                    // 同步置位 FINISHING：避免随后的 onPostFling 将其误判为普通 PULLING
+                    // 而并发第二个回弹动画（并发 snapTo 会取消 enterSecondFloor 协程）
+                    state.refreshFlag = SkyRefreshFlag.FINISHING
+                    scope.launch { state.enterSecondFloor() }
+                    onSecondFloor.invoke()
+                } else {
+                    state.refreshFlag = SkyRefreshFlag.REFRESHING
+                    scope.launch { state.animateOffsetTo(state.headerBound) }
+                    onRefresh()
+                }
                 available.mainAxis().toVelocity()
             }
             // 情境3：用户用力拉过了 Footer 的阈值，松手 -> 开始上拉加载
@@ -240,6 +273,13 @@ internal class SkyRefreshNestedScrollConnection(
 
     /**
      * 处理手势释放后未达到触发阈值而需要收回（弹回 0f）的复位逻辑。
+     *
+     * 主要目的是：清理未进入执行态的 PULLING 标记，并将未达阈值的偏移量回弹归位。
+     *
+     * 处理逻辑：
+     * - 复位所有 PULLING 标记（手势可能在一侧 PULLING 期间反向拉到另一侧）
+     * - Header 未达阈值 → 回弹归位
+     * - Footer 未达阈值 → 回弹归位；noMoreData 终态按过半规则决定停靠或收起
      */
     override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
         // 统一复位所有未进入执行态的 PULLING 标记：
@@ -247,7 +287,8 @@ internal class SkyRefreshNestedScrollConnection(
         if (state.refreshFlag == SkyRefreshFlag.PULLING) state.refreshFlag = SkyRefreshFlag.IDLE
         if (state.loadMoreFlag == SkyRefreshFlag.PULLING) state.loadMoreFlag = SkyRefreshFlag.IDLE
         // 如果拉了一半没有越过刷新阈值，放弃刷新操作并归位隐藏
-        if (state.refreshFlag != SkyRefreshFlag.REFRESHING && state.indicatorOffset > 0f) {
+        // （FINISHING 排除在外：刷新结束/进入二楼的回弹动画由状态机自己驱动，此处不得并发干预）
+        if (state.refreshFlag != SkyRefreshFlag.REFRESHING && state.refreshFlag != SkyRefreshFlag.FINISHING && state.indicatorOffset > 0f) {
             state.refreshFlag = SkyRefreshFlag.IDLE
             scope.launch { state.animateOffsetTo(0f) }
         }

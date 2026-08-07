@@ -83,6 +83,13 @@ fun AppRoot() {
         Screen.Horizontal -> HorizontalRefreshDemoScreen(onBack = { currentPage = Screen.Refresh })
         Screen.CustomIndicator -> CustomIndicatorDemoScreen(onBack = { currentPage = Screen.Refresh })
         Screen.AutoTrigger -> AutoTriggerDemoScreen(onBack = { currentPage = Screen.Refresh })
+        Screen.BallHeader -> BallHeaderDemoScreen(onBack = { currentPage = Screen.Refresh })
+        Screen.LottieHeader -> LottieHeaderDemoScreen(onBack = { currentPage = Screen.Refresh })
+        Screen.FixedContent -> FixedContentDemoScreen(onBack = { currentPage = Screen.Refresh })
+        Screen.FixedFront -> FixedFrontDemoScreen(onBack = { currentPage = Screen.Refresh })
+        Screen.TimeHeader -> TimeHeaderDemoScreen(onBack = { currentPage = Screen.Refresh })
+        Screen.SecondFloor -> SecondFloorDemoScreen(onBack = { currentPage = Screen.Refresh })
+        Screen.CustomSecondFloor -> CustomSecondFloorDemoScreen(onBack = { currentPage = Screen.Refresh })
     }
 }
 
@@ -97,6 +104,13 @@ sealed interface Screen {
     data object Horizontal : Screen
     data object CustomIndicator : Screen
     data object AutoTrigger : Screen
+    data object BallHeader : Screen
+    data object LottieHeader : Screen
+    data object FixedContent : Screen
+    data object FixedFront : Screen
+    data object TimeHeader : Screen
+    data object SecondFloor : Screen
+    data object CustomSecondFloor : Screen
 }
 
 /**
