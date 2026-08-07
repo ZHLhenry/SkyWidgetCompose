@@ -1,0 +1,15 @@
+[versions]
+skyBuildLogic = "1.2.3"
+activityCompose = "1.13.0"
+
+[libraries]
+androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
+androidx-compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
+
+[plugins]
+sky-android-application = { id = "sky.android.application", version.ref = "skyBuildLogic" }
+sky-android-application-flavors = { id = "sky.android.application.flavors", version.ref = "skyBuildLogic" }
+sky-android-library = { id = "sky.android.library", version.ref = "skyBuildLogic" }
+sky-android-hilt = { id = "sky.android.hilt", version.ref = "skyBuildLogic" }
+sky-android-publish = { id = "sky.android.publish", version.ref = "skyBuildLogic" }
+
