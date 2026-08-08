@@ -2,6 +2,7 @@ package com.sky.widget.sample
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
@@ -17,9 +18,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -28,8 +26,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.activity.OnBackPressedDispatcher
-import androidx.activity.compose.BackHandler
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -38,6 +34,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.sky.widget.grid.SkyGridLayout
 import com.sky.widget.sample.ui.theme.SkyWidgetComposeTheme
 
 class MainActivity : ComponentActivity() {
@@ -64,9 +61,12 @@ class MainActivity : ComponentActivity() {
 fun AppRoot() {
     var currentPage by remember { mutableStateOf<Screen>(Screen.Home) }
 
-    // 非首页时拦截返回按钮：示例详情页先返回刷新菜单，菜单再返回首页
+    // 非首页时拦截返回按钮
     BackHandler(enabled = currentPage != Screen.Home) {
-        currentPage = if (currentPage == Screen.Refresh) Screen.Home else Screen.Refresh
+        currentPage = when (currentPage) {
+            Screen.Refresh, Screen.StateLayout, Screen.Signature, Screen.AnnotatedText, Screen.Grid, Screen.Marquee, Screen.Badge -> Screen.Home
+            else -> Screen.Refresh
+        }
     }
 
     when (currentPage) {
@@ -90,6 +90,12 @@ fun AppRoot() {
         Screen.TimeHeader -> TimeHeaderDemoScreen(onBack = { currentPage = Screen.Refresh })
         Screen.SecondFloor -> SecondFloorDemoScreen(onBack = { currentPage = Screen.Refresh })
         Screen.CustomSecondFloor -> CustomSecondFloorDemoScreen(onBack = { currentPage = Screen.Refresh })
+        Screen.StateLayout -> StateLayoutDemoScreen(onBack = { currentPage = Screen.Home })
+        Screen.Signature -> SignatureDemoScreen(onBack = { currentPage = Screen.Home })
+        Screen.AnnotatedText -> AnnotatedTextDemoScreen(onBack = { currentPage = Screen.Home })
+            Screen.Grid -> GridDemoScreen(onBack = { currentPage = Screen.Home })
+            Screen.Marquee -> MarqueeDemoScreen(onBack = { currentPage = Screen.Home })
+            Screen.Badge -> BadgeDemoScreen(onBack = { currentPage = Screen.Home })
     }
 }
 
@@ -111,6 +117,12 @@ sealed interface Screen {
     data object TimeHeader : Screen
     data object SecondFloor : Screen
     data object CustomSecondFloor : Screen
+    data object StateLayout : Screen
+    data object Signature : Screen
+    data object AnnotatedText : Screen
+    data object Grid : Screen
+    data object Marquee : Screen
+    data object Badge : Screen
 }
 
 /**
@@ -146,25 +158,35 @@ fun HomeScreen(onNavigate: (Screen) -> Unit) {
             ComponentItem("签名板", "\u270F\uFE0F"),
             ComponentItem("二维码", "\uD83D\uDCF6"),
             ComponentItem("刷新示例", "\uD83D\uDCC5"),
+            ComponentItem("页面状态", "\uD83D\uDCCE"),
+            ComponentItem("高亮文字", "\uD83D\uDD8A"),
+            ComponentItem("网格布局", "\uD83D\uDCD0"),
+            ComponentItem("跑马灯", "\uD83D\uDCDD"),
+            ComponentItem("徽章", "\uD83C\uDFF7\uFE0F"),
         )
 
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(3),
+        SkyGridLayout(
+            items = components,
+            columns = 3,
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(1.dp),
-            horizontalArrangement = Arrangement.spacedBy(1.dp),
-            verticalArrangement = Arrangement.spacedBy(1.dp)
-        ) {
-            items(components, key = { it.name }) { item ->
-                ComponentGridItem(
-                    item = item,
-                    onClick = {
-                        when (item.name) {
-                            "刷新示例" -> onNavigate(Screen.Refresh)
-                        }
+            horizontalSpacing = 1.dp,
+            verticalSpacing = 1.dp
+        ) { item ->
+            ComponentGridItem(
+                item = item,
+                onClick = {
+                    when (item.name) {
+                        "刷新示例" -> onNavigate(Screen.Refresh)
+                        "页面状态" -> onNavigate(Screen.StateLayout)
+                        "签名板" -> onNavigate(Screen.Signature)
+                        "高亮文字" -> onNavigate(Screen.AnnotatedText)
+                        "网格布局" -> onNavigate(Screen.Grid)
+                        "跑马灯" -> onNavigate(Screen.Marquee)
+                        "徽章" -> onNavigate(Screen.Badge)
                     }
-                )
-            }
+                }
+            )
         }
     }
 }

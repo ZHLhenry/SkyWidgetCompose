@@ -1,6 +1,6 @@
 [versions]
 skyBuildLogic = "1.2.3"
-skyWidgetCompose = "1.0.0"
+skyWidgetCompose = "1.0.1"
 activityCompose = "1.13.0"
 lottieCompose = "6.7.1"
 

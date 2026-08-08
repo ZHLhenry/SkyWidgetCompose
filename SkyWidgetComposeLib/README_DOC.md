@@ -1,649 +1,436 @@
-# SkyWidgetCompose 技术文档
+# SkyWidgetCompose 文档
 
-> 一个基于 Jetpack Compose 的高性能下拉刷新 / 上拉加载组件库
-
----
-
-## 大纲
-
-- [1. 项目概述](#1-项目概述)
-- [2. 核心架构](#2-核心架构)
-  - [2.1 状态机驱动](#21-状态机驱动)
-  - [2.2 手势拦截与路由分发](#22-手势拦截与路由分发)
-  - [2.3 硬件加速渲染](#23-硬件加速渲染)
-  - [2.4 视口解耦与增量渲染](#24-视口解耦与增量渲染)
-- [3. 核心组件](#3-核心组件)
-  - [3.1 SkyRefreshLayout](#31-skyrefreshlayout)
-  - [3.2 SkyRefreshState](#32-skyrefreshstate)
-  - [3.3 SkyRefreshFlag](#33-skyrefreshflag)
-  - [3.4 SkyRefreshStyle](#34-skyrefreshstyle)
-- [4. 内置指示器](#4-内置指示器)
-  - [4.1 Header 组件](#41-header-组件)
-  - [4.2 Footer 组件](#42-footer-组件)
-- [5. 位移样式](#5-位移样式)
-- [6. 资源定制](#6-资源定制)
-- [7. 使用指南](#7-使用指南)
-  - [7.1 基础用法](#71-基础用法)
-  - [7.2 仅下拉刷新](#72-仅下拉刷新)
-  - [7.3 仅上拉加载](#73-仅上拉加载)
-  - [7.4 横向滑动](#74-横向滑动)
-  - [7.5 自定义指示器](#75-自定义指示器)
-  - [7.6 程序化触发](#76-程序化触发)
-  - [7.7 下拉进入二楼](#77-下拉进入二楼)
-- [8. 行为约定](#8-行为约定)
-- [9. 构建与依赖](#9-构建与依赖)
-- [10. 资源清单](#10-资源清单)
+SkyWidgetCompose 是一组基于 Jetpack Compose 的通用 UI 组件库，覆盖刷新、徽章、网格、签名板、页面状态、高亮文本、跑马灯等常见场景。
 
 ---
 
-## 1. 项目概述
+## 目录
 
-SkyWidgetCompose 是一个专为 Jetpack Compose 设计的下拉刷新 / 上拉加载组件库，提供声明式 API、流畅的动画效果和高度可定制的指示器组件。
-
-**核心特性：**
-
-- **声明式 API**：完全符合 Compose 设计哲学，通过状态驱动 UI
-- **高性能渲染**：基于 `graphicsLayer` 硬件加速，零重绘位移
-- **无侵入式设计**：通过 `NestedScrollConnection` 透明包裹任意滚动组件
-- **丰富的指示器**：7 种内置 Header + 1 种 Footer，支持完全自定义
-- **双端泛型适配**：单套逻辑兼容纵向 / 横向滚动
-- **二楼机制**：支持下拉进入二楼（参考 SmartRefreshLayout TwoLevelHeader）
-- **视口解耦**：上拉加载完成时 Content 驻留，新数据无缝衔接
+- [快速开始](#快速开始)
+- [SkyRefreshLayout（下拉刷新 / 上拉加载）](#skyrefreshlayout下拉刷新--上拉加载)
+- [SkyBadge（徽章）](#skybadge徽章)
+- [SkyGridLayout（静态网格）](#skygridlayout静态网格)
+- [SkySignatureView（签名板）](#skysignatureview签名板)
+- [SkyPageStateLayout（页面状态布局）](#skypagestatelayout页面状态布局)
+- [SkyAnnotatedText（高亮文本）](#skyannotatedtext高亮文本)
+- [SkyMarqueeView（跑马灯 / 轮播）](#skymarqueeview跑马灯--轮播)
 
 ---
 
-## 2. 核心架构
+## 快速开始
 
-### 2.1 状态机驱动
+项目根目录的 `build.gradle.kts` 已通过 `skyBuild.enableCompose = true` 自动注入 Compose BOM 与核心依赖，模块内无需再手写 Compose 依赖。
 
-组件采用有限状态机（FSM）管理刷新生命周期，定义了四个确定性状态：
+在需要使用的模块中直接引用库坐标（发布时）：
 
-```
-┌─────────┐     下拉越界      ┌──────────┐     达到阈值松手     ┌────────────┐
-│  IDLE   │ ───────────────→ │ PULLING  │ ─────────────────→ │ REFRESHING │
-└─────────┘                  └──────────┘                    └────────────┘
-     ↑                            │                                │
-     │                            │ 未达阈值松手                     │ 业务层调用
-     │                            ↓                                ↓
-     │                       ┌──────────┐                    ┌────────────┐
-     └───────────────────────│  FINISHING │←───────────────────│  FINISHING  │
-           回弹动画完成        └──────────┘   回弹动画完成      └────────────┘
+```kotlin
+dependencies {
+    implementation("com.sky.lib:SkyWidgetCompose:1.0.0")
+}
 ```
 
-| 状态 | 描述 | 触发条件 |
-|------|------|----------|
-| `IDLE` | 空闲状态 | 默认状态，组件静止或正常滚动 |
-| `PULLING` | 越界拉拽 | 手势越过物理边界，但未达触发阈值 |
-| `REFRESHING` | 异步执行 | 偏移量突破阈值，已派发业务回调 |
-| `FINISHING` | 闭幕回弹 | 业务层调用 `finish()`，执行归位动画 |
-
-### 2.2 手势拦截与路由分发
-
-通过实现 `NestedScrollConnection` 接口，在滚动事件流的 Pre / Post 阶段拦截手势能量：
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     NestedScrollConnection                       │
-├─────────────────────────────────────────────────────────────────┤
-│  onPreScroll   │ 子视图滚动前：优先收起已拉出的 Header/Footer      │
-│  onPostScroll  │ 子视图滚动后：将溢出位移转化为阻尼拉长效果        │
-│  onPreFling    │ 惯性滚动前：判断是否触发刷新/加载/二楼           │
-│  onPostFling   │ 惯性滚动后：复位未达阈值的 PULLING 状态          │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-**关键设计：**
-
-- **双端泛型适配**：通过 `mainAxis()` 扩展函数将二维向量降维为主轴一维向量，单套逻辑兼容横/纵向
-- **阻尼控制**：Header 侧使用 `stickinessLevel` 阻尼系数（0~1），Footer 侧 1:1 线性跟手
-- **惯性滚动限制**：Fling 最多消费前 5 帧，阻尼倍率 0.3，避免 Header 缓慢爬出
-- **互斥约束**：下拉刷新与上拉加载不能同时进行
-
-### 2.3 硬件加速渲染
-
-摒弃传统改变约束导致的高频 UI 重排，采用 `graphicsLayer` 图层平移：
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Layout 阶段                               │
-│  ┌─────────┐  ┌─────────────┐  ┌─────────┐                      │
-│  │ Header  │  │   Content   │  │ Footer  │  ← 静态约束测量       │
-│  │ (测量)  │  │   (测量)    │  │ (测量)  │                      │
-│  └─────────┘  └─────────────┘  └─────────┘                      │
-├─────────────────────────────────────────────────────────────────┤
-│                        Draw 阶段                                 │
-│  ┌─────────┐  ┌─────────────┐  ┌─────────┐                      │
-│  │ Header  │  │   Content   │  │ Footer  │  ← graphicsLayer     │
-│  │translationY│  │translationY│  │translationY│   硬件加速平移    │
-│  └─────────┘  └─────────────┘  └─────────┘                      │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-**优势：**
-
-1. **静态约束测量**：Content 始终保持全屏测量，不因拖拽发生约束变更
-2. **硬件加速平移**：仅在 Draw 阶段修改 translation 属性，CPU 开销极低
-3. **边界动态扩容**：解耦驻留时通过 `addedHeight` 动态延展物理渲染范围
-
-### 2.4 视口解耦与增量渲染
-
-**问题场景**：上拉加载完成后，新数据追加到列表底部。如果直接移除 Footer，列表内容会突然上跳。
-
-**解决方案**：视口解耦分离
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  加载前                                                          │
-│  ┌─────────────┐  ← indicatorOffset = -footerBound              │
-│  │   Content   │                                               │
-│  │  (驻留中)   │  ← decoupledContentOffset = -footerBound       │
-│  ├─────────────┤                                               │
-│  │   Footer    │  ← 正在加载...                                 │
-│  └─────────────┘                                               │
-├─────────────────────────────────────────────────────────────────┤
-│  加载后（解耦）                                                  │
-│  ┌─────────────┐  ← indicatorOffset = 0（瞬间归位）              │
-│  │   Content   │                                               │
-│  │  (驻留中)   │  ← decoupledContentOffset = -footerBound       │
-│  │             │    （保持不动，用户无感知）                      │
-│  │  新数据区域  │  ← addedHeight = footerBound（动态扩容）        │
-│  └─────────────┘                                               │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-**数学关系**：
-```
-H + addedHeight + decoupledContentOffset == H + indicatorOffset
-→ addedHeight = indicatorOffset - decoupledContentOffset
-```
+本地开发时，在 `local.properties` 中设置 `useLocalSkyWidgetCompose=true`，即可通过源码模块 `:SkyWidgetComposeLib` 调试。
 
 ---
 
-## 3. 核心组件
+## SkyRefreshLayout（下拉刷新 / 上拉加载）
 
-### 3.1 SkyRefreshLayout
+容器式刷新组件，内部自动托管 `LazyListState`，支持 `LazyColumn` / `LazyRow`。
 
-核心刷新容器，基于原生 `Layout` 与硬件加速的复合渲染引擎。
-
-**函数签名：**
+### API
 
 ```kotlin
 @Composable
 fun SkyRefreshLayout(
-    modifier: Modifier = Modifier,
-    state: SkyRefreshState,
+    state: SkyRefreshState = rememberSkyRefreshState(),
     orientation: Orientation = Orientation.Vertical,
-    style: SkyRefreshStyle = SkyRefreshStyle.Translate,
-    onRefresh: (() -> Unit)? = null,
-    onLoadMore: (() -> Unit)? = null,
+    onRefresh: () -> Unit = {},
+    onLoadMore: () -> Unit = {},
+    autoLoadMoreThreshold: Dp = 0.dp,
     secondFloorRate: Float = 0f,
-    onSecondFloor: (() -> Unit)? = null,
+    onSecondFloor: () -> Unit = {},
     noMoreDataText: String? = null,
-    header: @Composable () -> Unit = { SkyClassicsRefreshHeader(...) },
-    footer: @Composable () -> Unit = { SkyClassicsRefreshFooter(...) },
+    style: SkyRefreshStyle = SkyRefreshStyle.Translate,
+    header: @Composable (SkyRefreshState) -> Unit = { SkyClassicsRefreshHeader(state = it) },
+    footer: @Composable (SkyRefreshState) -> Unit = { SkyClassicsRefreshFooter(state = it) },
     content: @Composable () -> Unit
 )
 ```
 
-**参数说明：**
-
-| 参数 | 类型 | 默认值 | 描述 |
-|------|------|--------|------|
-| `modifier` | `Modifier` | `Modifier` | 外部修饰符 |
-| `state` | `SkyRefreshState` | 必填 | 核心状态机引擎 |
-| `orientation` | `Orientation` | `Vertical` | 排版方向（纵向/横向） |
-| `style` | `SkyRefreshStyle` | `Translate` | 位移样式 |
-| `onRefresh` | `(() -> Unit)?` | `null` | 下拉刷新回调 |
-| `onLoadMore` | `(() -> Unit)?` | `null` | 上拉加载回调 |
-| `secondFloorRate` | `Float` | `0f` | 二楼触发倍率（>0 启用） |
-| `onSecondFloor` | `(() -> Unit)?` | `null` | 进入二楼回调 |
-| `noMoreDataText` | `String?` | `null` | "无更多数据"文案（不传则终态不展示） |
-| `header` | `@Composable () -> Unit` | `SkyClassicsRefreshHeader` | 自定义头部渲染器 |
-| `footer` | `@Composable () -> Unit` | `SkyClassicsRefreshFooter` | 自定义尾部渲染器 |
-| `content` | `@Composable () -> Unit` | 必填 | 内容主体 |
-
-### 3.2 SkyRefreshState
-
-核心状态机与数据源控制中心，作为唯一的数据源（Source of Truth）。
-
-**创建方式：**
+### 基础用法
 
 ```kotlin
-val state = rememberSkyRefreshState(
-    stickinessLevel = 0.5f,  // 阻尼系数（0~1）
-    enableRefresh = true,    // 是否启用下拉刷新
-    enableLoadMore = true    // 是否启用上拉加载
-)
-```
+val state = rememberSkyRefreshState()
 
-**属性：**
-
-| 属性 | 类型 | 描述 |
-|------|------|------|
-| `stickinessLevel` | `Float` | 阻尼系数，可动态修改 |
-| `enableRefresh` | `Boolean` | 全局开关：是否允许下拉刷新 |
-| `enableLoadMore` | `Boolean` | 全局开关：是否允许上拉加载 |
-| `noMoreData` | `Boolean` | 数据边界标识（仅应通过 `finish()` 变更） |
-| `indicatorOffset` | `Float` | 当前指示器的实际物理偏移量（px） |
-| `refreshFlag` | `SkyRefreshFlag` | 顶部下拉刷新状态机标识 |
-| `loadMoreFlag` | `SkyRefreshFlag` | 底部上拉加载状态机标识 |
-| `headerBound` | `Float` | Header 的实际测量大小（internal） |
-| `footerBound` | `Float` | Footer 的实际测量大小（internal） |
-
-**方法：**
-
-| 方法 | 描述 |
-|------|------|
-| `finish(noMoreData: Boolean = false)` | 统一结束当前活跃的刷新/加载操作 |
-| `autoRefresh()` | 程序化触发下拉刷新 |
-| `autoLoadMore()` | 程序化触发上拉加载 |
-
-### 3.3 SkyRefreshFlag
-
-刷新容器的生命周期状态枚举。
-
-```kotlin
-enum class SkyRefreshFlag {
-    IDLE,       // 空闲状态
-    PULLING,    // 越界拉拽状态
-    REFRESHING, // 异步执行状态
-    FINISHING   // 闭幕回弹状态
-}
-```
-
-### 3.4 SkyRefreshStyle
-
-位移样式枚举，定义下拉刷新时三层结构的空间布局策略。
-
-```kotlin
-enum class SkyRefreshStyle {
-    Translate,     // 默认：Header 推出，Content 跟随下移（微信式）
-    FixedContent,  // 内容固定：Header 滑入覆盖（淘宝式）
-    FixedFront     // 固定在前：Header 悬浮，仅驱动内部动画（美团式）
-}
-```
-
----
-
-## 4. 内置指示器
-
-### 4.1 Header 组件
-
-| 组件 | 描述 | 适用场景 |
-|------|------|----------|
-| `SkyClassicsRefreshHeader` | 经典默认 Header：旋转图标 | 通用场景 |
-| `SkyBallRefreshHeader` | 球状加载 Header：三球缩放动画 | 通用场景 |
-| `SkyLottieRefreshHeader` | Lottie 动画 Header | 需要丰富动画效果 |
-| `SkyCircleRefreshHeader` | 圆圈风格 Header（Material Design） | FixedContent 样式 |
-| `SkyProgressRefreshHeader` | 辉光+进度条 Header | FixedFront 样式 |
-| `SkyTimeRefreshHeader` | 时间文案 Header（ClassicsHeader 风格） | 需要显示最后更新时间 |
-| `SkyTwoLevelRefreshHeader` | 二楼 Header | 下拉进入二楼场景 |
-
-**使用示例：**
-
-```kotlin
-// 使用内置球状加载 Header
 SkyRefreshLayout(
     state = state,
-    header = { SkyBallRefreshHeader(flag = state.refreshFlag) },
-    ...
-)
-
-// 使用圆圈风格 Header（FixedContent 样式）
-SkyRefreshLayout(
-    state = state,
-    style = SkyRefreshStyle.FixedContent,
-    header = { SkyCircleRefreshHeader(state) },
-    ...
-)
+    onRefresh = { viewModel.refresh() },
+    onLoadMore = { viewModel.loadMore() },
+    autoLoadMoreThreshold = 80.dp,
+    noMoreDataText = "没有更多数据"
+) {
+    LazyColumn(state = state.listState) {
+        items(viewModel.items) { Item(it) }
+    }
+}
 ```
 
-### 4.2 Footer 组件
+### 关键概念
 
-| 组件 | 描述 |
+| 名称 | 说明 |
 |------|------|
-| `SkyClassicsRefreshFooter` | 经典默认 Footer：旋转图标 + 文案，支持"无更多数据"终态停靠 |
+| `SkyRefreshFlag` | `IDLE` / `PULLING` / `REFRESHING` / `FINISHING` |
+| `SkyRefreshStyle` | `Translate`（内容跟随）、`FixedContent`（内容固定，Header 滑入覆盖）、`FixedFront`（Header 固定边缘原位，绘制在上层） |
+| `state.finish(noMoreData = true)` | 结束加载并标记无更多数据 |
+| `state.autoRefresh()` / `state.autoLoadMore()` | 主动触发刷新 / 加载 |
+| `secondFloorRate` | 大于 0 时，下拉超过 `headerBound × rate` 松手进入二楼 |
 
-**特性：**
+### Header / Footer 定制
 
-- 加载中：旋转图标 + 文案（500ms 循环旋转）
-- 数据穷尽：静态文案（可被 1:1 跟手拉出停靠查看）
-- `noMoreText` 为 null 时终态整体不渲染（零尺寸）
+每个 Header/Footer 都提供 `@Stable` 状态类 + `rememberXxxState()` 工厂。可定制文案、图标、Lottie 资源、颜色、时间格式等。
 
----
+可选 Header：
 
-## 5. 位移样式
-
-### Translate（默认）
-
-经典微信式：Header 从顶部推出，Content 整体跟随下移。
-
-```
-下拉前          下拉中
-┌─────────┐    ┌─────────┐
-│ Content │    │ Header  │  ← 滑入
-│         │    ├─────────┤
-│         │    │ Content │  ← 跟随下移
-└─────────┘    └─────────┘
-```
-
-### FixedContent
-
-类淘宝效果：Content 固定不动，Header 从顶部滑入覆盖。
-
-```
-下拉前          下拉中
-┌─────────┐    ┌─────────┐
-│ Content │    │ Header  │  ← 滑入覆盖
-│         │    │ (覆盖)  │
-│         │    │ Content │  ← 固定不动
-└─────────┘    └─────────┘
-```
-
-### FixedFront
-
-类美团效果：Header 始终悬浮在内容顶层原位，仅驱动内部动画。
-
-```
-下拉前          下拉中
-┌─────────┐    ┌─────────┐
-│ Header  │    │ Header  │  ← 位置不变，内部动画
-│ (隐藏)  │    │ (显示)  │
-├─────────┤    ├─────────┤
-│ Content │    │ Content │  ← 固定不动
-└─────────┘    └─────────┘
-```
+- `SkyClassicsRefreshHeader`（默认）
+- `SkyBallRefreshHeader`
+- `SkyLottieRefreshHeader`（需额外引入 `com.airbnb.android:lottie-compose:6.7.1`）
+- `SkyCircleRefreshHeader`
+- `SkyProgressRefreshHeader`
+- `SkyTimeRefreshHeader`
+- `SkyTwoLevelRefreshHeader`
 
 ---
 
-## 6. 资源定制
+## SkyBadge（徽章）
 
-每个 Header/Footer 都有对应的 `@Stable` 状态类 + `rememberXxxState()` 工厂，所有可定制项通过 state 传递。
+提供容器式徽章 `SkyBadgeBox` 与独立徽章 `SkyBadgeView`，支持数字、文本、圆点、九宫格方位以及拖拽消除动画。
 
-**对应关系：**
-
-| 组件 | 状态类 | 可定制项 |
-|------|--------|----------|
-| `SkyClassicsRefreshHeader` | `SkyClassicsRefreshHeaderState` | `iconRes` |
-| `SkyClassicsRefreshFooter` | `SkyClassicsRefreshFooterState` | `loadingText`, `loadingIconRes` |
-| `SkyBallRefreshHeader` | `SkyBallRefreshHeaderState` | `refreshingColor`, `idleColor` |
-| `SkyLottieRefreshHeader` | `SkyLottieRefreshHeaderState` | `rawRes`, `speed` |
-| `SkyCircleRefreshHeader` | `SkyCircleRefreshHeaderState` | `backgroundColor`, `contentColor` |
-| `SkyProgressRefreshHeader` | `SkyProgressRefreshHeaderState` | `color` |
-| `SkyTimeRefreshHeader` | `SkyTimeRefreshHeaderState` | 4 文案 + `timeFormat` |
-| `SkyTwoLevelRefreshHeader` | `SkyTwoLevelRefreshHeaderState` | 5 文案 |
-
-**使用示例：**
-
-```kotlin
-// 定制球状加载 Header 颜色
-header = {
-    SkyBallRefreshHeader(
-        flag = state.refreshFlag,
-        headerState = rememberSkyBallRefreshHeaderState(
-            refreshingColor = Color(0xFF33AAFF),
-            idleColor = Color(0xFFEEEEEE)
-        )
-    )
-}
-
-// 定制时间文案 Header
-header = {
-    SkyTimeRefreshHeader(
-        state,
-        headerState = rememberSkyTimeRefreshHeaderState(
-            pullingText = "Pull to refresh",
-            releaseText = "Release to refresh",
-            refreshingText = "Refreshing...",
-            finishedText = "Refresh complete",
-            timeFormat = "'Last update:' yyyy-MM-dd HH:mm:ss"
-        )
-    )
-}
-```
-
----
-
-## 7. 使用指南
-
-### 7.1 基础用法
+### API
 
 ```kotlin
 @Composable
-fun BasicRefreshScreen() {
-    val scope = rememberCoroutineScope()
-    val state = rememberSkyRefreshState()
-    var items by remember { mutableStateOf(List(20) { "列表项 #${it + 1}" }) }
-
-    SkyRefreshLayout(
-        modifier = Modifier.fillMaxSize(),
-        state = state,
-        onRefresh = {
-            scope.launch {
-                delay(1500)
-                items = items.shuffled()
-                state.finish()
-            }
-        },
-        onLoadMore = {
-            scope.launch {
-                delay(1500)
-                val appended = List(5) { "列表项 #${items.size + it + 1}" }
-                items = items + appended
-                state.finish(noMoreData = items.size >= 50)
-            }
-        },
-        noMoreDataText = "已经到底啦 ~"
-    ) {
-        LazyColumn(modifier = Modifier.fillMaxSize()) {
-            items(items, key = { it }) { text ->
-                Text(text = text, modifier = Modifier.padding(16.dp))
-            }
-        }
-    }
-}
-```
-
-### 7.2 仅下拉刷新
-
-```kotlin
-val state = rememberSkyRefreshState(enableLoadMore = false)
-
-SkyRefreshLayout(
-    state = state,
-    onRefresh = { /* ... */ }
-) { /* ... */ }
-```
-
-### 7.3 仅上拉加载
-
-```kotlin
-val state = rememberSkyRefreshState(enableRefresh = false)
-
-SkyRefreshLayout(
-    state = state,
-    onLoadMore = { /* ... */ },
-    noMoreDataText = "已经到底啦"
-) { /* ... */ }
-```
-
-### 7.4 横向滑动
-
-```kotlin
-SkyRefreshLayout(
-    state = state,
-    orientation = Orientation.Horizontal,
-    onRefresh = { /* ... */ },
-    onLoadMore = { /* ... */ }
-) {
-    LazyRow { /* ... */ }
-}
-```
-
-### 7.5 自定义指示器
-
-```kotlin
-SkyRefreshLayout(
-    state = state,
-    header = {
-        // 自定义 Header：根据 flag 状态驱动 UI
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(60.dp)
-                .background(Color(0xFFE3F2FD)),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = when (state.refreshFlag) {
-                    SkyRefreshFlag.IDLE -> "继续下拉"
-                    SkyRefreshFlag.PULLING -> "松开立即刷新"
-                    SkyRefreshFlag.REFRESHING -> "正在刷新…"
-                    SkyRefreshFlag.FINISHING -> "刷新完成"
-                }
-            )
-        }
-    },
-    footer = { /* 自定义 Footer */ }
-) { /* ... */ }
-```
-
-### 7.6 程序化触发
-
-```kotlin
-// 按钮触发刷新
-Button(onClick = { scope.launch { state.autoRefresh() } }) {
-    Text("刷新")
-}
-
-// 按钮触发加载
-Button(onClick = { scope.launch { state.autoLoadMore() } }) {
-    Text("加载更多")
-}
-
-// 动态开关
-Switch(
-    checked = state.enableRefresh,
-    onCheckedChange = { state.enableRefresh = it }
+fun SkyBadgeBox(
+    modifier: Modifier = Modifier,
+    state: SkyBadgeState = rememberSkyBadgeState(),
+    gravity: SkyBadgeGravity = SkyBadgeGravity.TOP_END,
+    offset: DpOffset = DpOffset.Zero,
+    backgroundColor: Color = Color.Red,
+    textColor: Color = Color.White,
+    textSize: TextUnit = 11.sp,
+    horizontalPadding: Dp = 4.dp,
+    verticalPadding: Dp = 0.dp,
+    borderColor: Color = Color.Unspecified,
+    borderWidth: Dp = 0.dp,
+    showShadow: Boolean = true,
+    draggable: Boolean = false,
+    maxDragDistance: Dp = 80.dp,
+    onDragStateChanged: ((Int) -> Unit)? = null,
+    badge: @Composable (SkyBadgeState) -> Unit = { DefaultSkyBadgeContent(it) },
+    content: @Composable () -> Unit
 )
 ```
 
-### 7.7 下拉进入二楼
+### 基础用法
 
 ```kotlin
-var secondFloorOpen by remember { mutableStateOf(false) }
+val state = rememberSkyBadgeState(initialNumber = 12)
 
-Box(modifier = Modifier.fillMaxSize()) {
-    SkyRefreshLayout(
-        state = state,
-        secondFloorRate = 2f,  // 二级阈值 = headerBound × 2
-        onSecondFloor = { secondFloorOpen = true },
-        header = { SkyTwoLevelRefreshHeader(state, secondFloorRate = 2f) },
-        onRefresh = { /* ... */ }
-    ) { /* ... */ }
+SkyBadgeBox(state = state) {
+    Icon(imageVector = Icons.Default.Mail, contentDescription = null)
+}
+```
 
-    // 二楼覆盖层
-    AnimatedVisibility(visible = secondFloorOpen) {
-        // 二楼内容
+### 九宫格方位 + 拖拽消除
+
+```kotlin
+val state = rememberSkyBadgeState(initialNumber = 8)
+
+SkyBadgeBox(
+    state = state,
+    gravity = SkyBadgeGravity.TOP_END,
+    draggable = true,
+    maxDragDistance = 90.dp,
+    onDragStateChanged = { dragState ->
+        when (dragState) {
+            SkyBadgeDragState.START -> { }
+            SkyBadgeDragState.DRAGGING -> { }
+            SkyBadgeDragState.DRAGGING_OUT_OF_RANGE -> { }
+            SkyBadgeDragState.CANCELED -> state.reset()
+            SkyBadgeDragState.SUCCEED -> { }
+        }
+    }
+) {
+    Box(modifier = Modifier.size(80.dp), contentAlignment = Alignment.Center) {
+        Text("目标")
     }
 }
 ```
 
----
+> 组件尺寸**包裹 content**，badge 基于 content 实际尺寸定位。拖拽绘制层（连接线、爆炸动画）与 content 共用同一坐标系，不会随外部容器宽度偏移。
 
-## 8. 行为约定
+### 状态说明
 
-| 约定 | 说明 |
+| 字段 | 说明 |
 |------|------|
-| Footer 侧 1:1 线性跟手 | 上拉加载无阻尼，与拉出方向手感对称 |
-| Header 下拉保留阻尼 | 下拉刷新使用 `stickinessLevel` 阻尼系数 |
-| 刷新与加载互斥 | 不允许同时处于 REFRESHING 状态 |
-| noMoreData 终态 | finish 后 Footer 平滑收起，不常驻视口底部 |
-| noMoreDataText 不传 | 终态 UI 整体不渲染（零尺寸，footerBound 归零） |
-| autoRefresh/autoLoadMore | 通过 State 内 internal refreshAction/loadMoreAction 派发 |
+| `number` | 0 隐藏，负数显示圆点 |
+| `text` | 优先级高于 `number` |
+| `maxNumber` | 超过后显示 `maxNumber+`，默认 99 |
+| `isExact` | 为 true 时精确显示大数字 |
+| `circleShapeThreshold` | 数字位数 ≤ 该值时按正圆绘制，默认 2 |
+| `showBadgeThreshold` | 数字 ≤ 该值时隐藏，默认 0 |
+| `reset(n)` | 重置数字并清空拖拽偏移 / 状态 |
+| `hide()` / `show()` / `toggle()` | 可见性控制 |
 
 ---
 
-## 9. 构建与依赖
+## SkyGridLayout（静态网格）
 
-**Gradle 配置：**
+按固定列数展示一组数据，类似 `LazyVerticalGrid` 的静态版本，适用于数据量较小、不需要懒加载的场景。
+
+### API
 
 ```kotlin
-// 根 build.gradle.kts
-extra["skyBuild.enableCompose"] = true  // SkyBuildLogic 自动注入 Compose BOM + 核心依赖
+@Composable
+fun <T> SkyGridLayout(
+    items: List<T>,
+    modifier: Modifier = Modifier,
+    columns: Int = 2,
+    horizontalSpacing: Dp = 8.dp,
+    verticalSpacing: Dp = 8.dp,
+    contentPadding: PaddingValues = PaddingValues(0.dp),
+    itemContent: @Composable (item: T) -> Unit
+)
+```
 
-// 模块 build.gradle.kts
-dependencies {
-    // Lottie 为 compileOnly 依赖，不传递给消费者
-    compileOnly(libs.lottie.compose)
+### 用法
+
+```kotlin
+SkyGridLayout(
+    items = products,
+    columns = 3,
+    horizontalSpacing = 8.dp,
+    verticalSpacing = 12.dp,
+    contentPadding = PaddingValues(16.dp)
+) { product ->
+    ProductCard(product)
 }
 ```
 
-**本地开发模式：**
+### 特点
 
-```properties
-# local.properties
-useLocalSkyWidgetCompose=true  # settings 才 include :SkyWidgetComposeLib
-```
+- 单元格宽度 = `(内容宽 - 列间距) / columns`
+- 每行高度取该行最大 item 高度
+- 支持 RTL
+- 不满列的最后一行照常摆放
 
-**Lottie 依赖约定：**
+---
 
-`SkyLottieRefreshHeader` 使用 Lottie 动画，但 Lottie 在库中为 **compileOnly** 依赖（完全不传递给消费者）。使用前需在宿主模块自行导包：
+## SkySignatureView（签名板）
+
+基于 Android `Paint` 与 `Path` 实现的签名板，支持自定义笔触、清空、保存为 Bitmap。
+
+### API
 
 ```kotlin
-implementation("com.airbnb.android:lottie-compose:6.7.1")
+@Composable
+fun SkySignatureView(
+    modifier: Modifier = Modifier,
+    state: SkySignatureViewState = rememberSkySignatureViewState(),
+    color: Color = Color.Black,
+    strokeWidth: Dp = 4.dp,
+    backgroundColor: Color = Color.White
+)
+
+@Composable
+fun SkySignatureView(
+    modifier: Modifier = Modifier,
+    state: SkySignatureViewState = rememberSkySignatureViewState(),
+    paint: Paint,
+    backgroundColor: Color = Color.White
+)
 ```
 
-组件内部有运行时探测，宿主未导包时抛出 `IllegalStateException` 并提示导包语句。
+### 用法
+
+```kotlin
+val state = rememberSkySignatureViewState()
+
+SkySignatureView(state = state)
+
+Button(onClick = { state.clear() }) { Text("清空") }
+Button(onClick = {
+    val bitmap = state.save(Color.White)
+    // 保存或展示 bitmap
+}) { Text("保存") }
+```
+
+### 状态说明
+
+| 方法 | 说明 |
+|------|------|
+| `state.clear()` | 清空所有笔迹 |
+| `state.save(backgroundColor)` | 输出 ARGB_8888 Bitmap |
+| `state.isEmpty` | 当前是否没有任何笔迹 |
 
 ---
 
-## 10. 资源清单
+## SkyPageStateLayout（页面状态布局）
 
-**字符串资源（`sky_rl_*` 前缀）：**
+根据页面状态在 Loading / Success / Empty / Error 之间自动切换。
 
-| 资源名 | 默认值 | 用途 |
-|--------|--------|------|
-| `sky_rl_loading` | 正在加载 | Footer 加载中文案 |
-| `sky_rl_header_pulling` | 下拉开始刷新 | TimeHeader 下拉中文案 |
-| `sky_rl_header_release` | 释放立即刷新 | TimeHeader 拉过阈值文案 |
-| `sky_rl_header_refreshing` | 正在刷新… | TimeHeader 刷新中文案 |
-| `sky_rl_header_finished` | 刷新完成 | TimeHeader 刷新完成文案 |
-| `sky_rl_header_secondary` | 释放进入二楼 | TwoLevelHeader 二级阈值文案 |
-| `sky_rl_header_time_format` | '最后更新：'M-d HH:mm | TimeHeader 时间格式 |
+### API
 
-**颜色资源：**
+```kotlin
+@Composable
+fun SkyPageStateLayout(
+    pageState: SkyPageState,
+    modifier: Modifier = Modifier,
+    onRetry: () -> Unit = {},
+    loading: @Composable () -> Unit = { SkyLoadingWidget() },
+    empty: @Composable (message: String) -> Unit = { SkyEmptyWidget(message = it, onRetry = onRetry) },
+    error: @Composable (message: String) -> Unit = { SkyErrorWidget(message = it, onRetry = onRetry) },
+    content: @Composable () -> Unit
+)
+```
 
-| 资源名 | 值 | 用途 |
-|--------|-----|------|
-| `sky_rl_text_title` | #171E2C | 标题文字颜色 |
-| `sky_rl_text_tertiary` | #9197A3 | 次要文字颜色 |
+### 用法
 
-**图标资源：**
+```kotlin
+val state by viewModel
 
-| 资源名 | 用途 |
-|--------|------|
-| `sky_icon_refresh_loading` | Header 刷新图标 |
-| `sky_icon_load_more_loading` | Footer 加载图标 |
+SkyPageStateLayout(
+    pageState = state.pageState,
+    onRetry = { viewModel.load() }
+) {
+    LazyColumn {
+        items(state.datas) { ArticleItem(it) }
+    }
+}
+```
 
-**Lottie 资源：**
+### 占位组件
 
-| 资源名 | 用途 |
-|--------|------|
-| `sky_rl_lottie_refresh.json` | Lottie 默认动画 |
+- `SkyLoadingWidget`：居中转圈
+- `SkyEmptyWidget(message, image, onRetry)`：空数据占位
+- `SkyErrorWidget(message, image, onRetry)`：错误占位
+
+### 状态说明
+
+```kotlin
+sealed interface SkyPageState {
+    data object Loading : SkyPageState
+    data object Success : SkyPageState
+    data class Empty(val message: String = "") : SkyPageState
+    data class Error(val message: String = "") : SkyPageState
+}
+```
 
 ---
 
-## 附录
+## SkyAnnotatedText（高亮文本）
 
-### A. 版本历史
+支持通过正则表达式匹配文本并高亮，同时可为匹配内容添加点击事件。
 
-详见 [README_VERSION.md](./README_VERSION.md)
+### API
 
-### B. 许可证
+```kotlin
+@Composable
+fun SkyAnnotatedText(
+    text: String,
+    modifier: Modifier = Modifier,
+    style: TextStyle = MaterialTheme.typography.bodyMedium,
+    annotatedStyle: SpanStyle = SpanStyle(color = MaterialTheme.colorScheme.primary),
+    annotatedActions: List<SkyAnnotatedAction> = emptyList()
+)
 
-MIT License - 详见 [LICENSE](./LICENSE)
+data class SkyAnnotatedAction(
+    val regex: String,
+    val onClick: ((match: String) -> Unit)? = null
+)
+```
 
-### C. 示例代码
+### 用法
 
-完整示例请参考 `app` 模块中的 `RefreshDemoScreens.kt`，包含 13 个详细示例场景。
+```kotlin
+SkyAnnotatedText(
+    text = "我已阅读并同意《隐私政策》和《用户协议》",
+    annotatedActions = listOf(
+        SkyAnnotatedAction(regex = "《隐私政策》") { toast("隐私政策") },
+        SkyAnnotatedAction(regex = "《用户协议》") { toast("用户协议") }
+    )
+)
+```
+
+### 特点
+
+- 多规则匹配按起始位置排序，重叠时取最前面的匹配
+- 使用 `LinkAnnotation.Clickable` + Material3 `Text`，替代已废弃的 `ClickableText`
+
+---
+
+## SkyMarqueeView（跑马灯 / 轮播）
+
+通用轮播组件，支持上下左右四种切入方向，点击可暂停 / 继续或派发点击事件。
+
+### API
+
+```kotlin
+@Composable
+fun <T> SkyMarqueeView(
+    items: List<T>,
+    modifier: Modifier = Modifier,
+    state: SkyMarqueeState = rememberSkyMarqueeState(),
+    direction: SkyMarqueeDirection = SkyMarqueeDirection.LEFT,
+    onItemClick: ((Int, T) -> Unit)? = null,
+    itemContent: @Composable (T) -> Unit
+)
+```
+
+### 用法
+
+```kotlin
+val items = listOf("公告一", "公告二", "公告三")
+
+SkyMarqueeView(
+    items = items,
+    direction = SkyMarqueeDirection.LEFT,
+    onItemClick = { index, item -> toast("点击 $index: $item") }
+) { item ->
+    Text(item)
+}
+```
+
+### 状态控制
+
+```kotlin
+val state = rememberSkyMarqueeState(initialFlipping = true, initialFlipInterval = 3000L)
+
+state.startFlipping()   // 开始自动轮播
+state.stopFlipping()    // 停止
+state.toggleFlipping()  // 切换
+state.next(items.size)  // 下一项
+state.previous()        // 上一项
+state.reset()           // 回到第一项
+state.setCurrentIndex(index, items.size)
+```
+
+### 特点
+
+- 只有一条数据时不轮播，但仍展示内容
+- `onItemClick` 为 null 时，点击内容暂停 / 继续；传入时派发点击事件不自动暂停
+
+---
+
+## 附录：库资源前缀
+
+库内字符串 / 颜色资源统一使用前缀 `sky_rl_*`，R 文件路径为 `com.sky.widget.R`。
+
+---
+
+## 附录：发布坐标
+
+```groovy
+implementation "com.sky.lib:SkyWidgetCompose:1.0.0"
+```
+
+发布仓库与凭证来自 `local.properties` 中的 `mavenCentral.*` 配置；发布账号与仓库读取账号不同，请勿混用。
