@@ -85,7 +85,7 @@ fun SkyLottieRefreshHeader(
 ) {
     check(isLottieComposeAvailable) {
         "SkyLottieRefreshHeader 依赖 Lottie。" +
-            "请在自行添加依赖：implementation(\"com.airbnb.android:lottie-compose:版本号\")"
+            "请消费者自行添加依赖：implementation(\"com.airbnb.android:lottie-compose:版本号\")"
     }
     val composition by rememberLottieComposition(
         LottieCompositionSpec.RawRes(headerState.rawRes ?: R.raw.sky_rl_lottie_refresh)

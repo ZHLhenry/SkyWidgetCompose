@@ -18,33 +18,80 @@ import com.sky.widget.refresh.footer.SkyClassicsRefreshFooter
 import com.sky.widget.refresh.header.SkyClassicsRefreshHeader
 
 /**
- * 核心刷新容器（基于原生 Layout 与硬件加速的复合渲染引擎）。
+ * 核心刷新容器。
  *
- * 作为一个具备泛用性与极简状态机的高级嵌套滑动容器，其核心架构特性如下：
- * 1. **多维排版兼容**：通过 [Orientation] 动态重定向约束与平移向量，完美支持纵向（Vertical）与横向（Horizontal）的滚动场景。
- * 2. **无侵入式解耦**：不依赖或侵入任何具体的列表实现，通过标准的 [NestedScrollConnection] 拦截手势，
- *    对任意支持嵌套滚动的子组件（如 `LazyColumn`, `LazyRow`, `HorizontalPager` 等）实现透明包裹。
- * 3. **纯净硬件加速**：摒弃传统改变约束导致的高频 UI 重排（Relayout），全程依靠 [graphicsLayer] 的图层平移
- *    处理交互位移，将 CPU 开销降至极低，实现零卡顿的顺滑手势跟随。
- * 4. **预布局防闪动**：在底层的 [Layout] 测量阶段优先对首尾装饰层完成布局测量，彻底消除首帧渲染时的组件闪烁问题。
- * 5. **三层结构设计**：Header / Content / Footer 三层独立测量与放置，通过 [layoutId] 精准识别，
- *    支持灵活的样式切换（[SkyRefreshStyle]）而不影响内部布局逻辑。
+ * 基于原生 [Layout] 与 [graphicsLayer] 实现的嵌套滑动刷新/加载容器，
+ * 通过标准的 [NestedScrollConnection] 拦截手势，对 [LazyColumn]、[LazyRow]、[HorizontalPager] 等
+ * 支持嵌套滚动的子组件实现透明包裹，不依赖具体列表实现。
+ *
+ * ## 能力生效条件（属性搭配关系）
+ *
+ * 以下列出各能力需要同时满足的条件，避免只传部分参数导致功能不生效。
+ *
+ * ### 1. 下拉刷新
+ * 需要同时满足：
+ * - [state] 的 [SkyRefreshState.enableRefresh] 为 `true`（默认 `true`）
+ * - 传入非空的 [onRefresh]
+ * - Header 实际有测量高度（默认 [SkyClassicsRefreshHeader] 已满足）
+ *
+ * ### 2. 上拉加载
+ * 需要同时满足：
+ * - [state] 的 [SkyRefreshState.enableLoadMore] 为 `true`（默认 `true`）
+ * - 传入非空的 [onLoadMore]
+ * - Footer 实际有测量高度（默认 [SkyClassicsRefreshFooter] 已满足）
+ *
+ * ### 3. 无更多数据终态提示
+ * 需要同时满足：
+ * - 在 [onLoadMore] 回调中调用 `state.finish(noMoreData = true)`
+ * - 传入非空的 [noMoreDataText]
+ *
+ * 若 [noMoreDataText] 为 `null`，Footer 将零尺寸渲染，用户滑动到底后无法拉出“没有更多数据”提示。
+ *
+ * ### 4. 下拉进入二楼
+ * 需要同时满足：
+ * - 传入 [secondFloorRate] > 0f（建议 >= 1.5f，常用 2.0f）
+ * - 传入非空的 [onSecondFloor]
+ *
+ * 二级阈值 = Header 高度 × [secondFloorRate]。手指下拉越过该阈值后松手，会回调 [onSecondFloor]，
+ * Header 回弹隐藏，**不会触发 [onRefresh]**。
+ *
+ * 注意：当 [secondFloorRate] <= 1.0f 时，二楼阈值会低于或等于普通刷新阈值，普通下拉刷新将无法触发。
+ * 二楼 Header 推荐使用 [com.sky.widget.refresh.header.SkyTwoLevelRefreshHeader]；
+ * 若使用自定义 Header，可监听 [SkyRefreshState.indicatorOffset] 自行换算二楼进度。
+ *
+ * ### 5. 样式与 Header 的协作
+ * [style] 只影响下拉刷新侧的视觉表现：
+ * - [SkyRefreshStyle.Translate]：Content 跟随下移（默认）
+ * - [SkyRefreshStyle.FixedContent]：Content 固定，Header 滑入覆盖在 Content 之上
+ * - [SkyRefreshStyle.FixedFront]：Header 固定在容器边缘原位，Content 不动，仅 Header 内部动画反馈下拉状态
+ *
+ * [SkyRefreshStyle.FixedFront] 建议搭配能根据 [SkyRefreshState.indicatorOffset] 驱动内部进度的 Header，
+ * 例如 [com.sky.widget.refresh.header.SkyCircleRefreshHeader]、
+ * [com.sky.widget.refresh.header.SkyProgressRefreshHeader]。
+ *
+ * ### 6. 程序化触发
+ * 通过 [SkyRefreshState.autoRefresh] / [SkyRefreshState.autoLoadMore] 主动触发时，
+ * 同样需要传入非空的 [onRefresh] / [onLoadMore]，否则不会向业务层派发回调。
+ *
+ * ## 核心实现特点
+ * 1. **多维排版兼容**：通过 [Orientation] 动态重定向约束与平移向量，支持纵向与横向。
+ * 2. **无侵入式解耦**：不依赖具体列表实现，透明包裹支持嵌套滚动的子组件。
+ * 3. **硬件加速平移**：通过 [graphicsLayer] 处理位移，避免频繁重排。
+ * 4. **预布局防闪动**：[Layout] 测量阶段优先对首尾装饰层完成测量，消除首帧闪烁。
+ * 5. **三层结构设计**：Header / Content / Footer 通过 [layoutId] 识别，支持样式切换。
  *
  * @param modifier 外部修饰符
- * @param state 核心状态机引擎，控制并追踪当前的阻尼平移量与生命周期状态
- * @param orientation 排版方向。决定了手势拦截的作用轴以及 Header/Footer 的挂载方位
- * @param style 位移样式 [SkyRefreshStyle]：默认 [SkyRefreshStyle.Translate] 内容跟随；
- * [SkyRefreshStyle.FixedContent] 时下拉刷新侧内容固定、Header 滑入覆盖；
- * [SkyRefreshStyle.FixedFront] 时 Header 固定悬浮在内容顶层原位，下拉仅驱动 Header 内部动画
- * @param onRefresh 下拉刷新（或向右拖拽）触发的异步回调
- * @param onLoadMore 上拉加载（或向左拖拽）触发的异步回调
- * @param secondFloorRate 二楼触发倍率：> 0 时启用“下拉进入二楼”，
- * 松手偏移超过 `headerBound × secondFloorRate` 则触发 [onSecondFloor] 而非刷新；默认 0 关闭
- * @param onSecondFloor 进入二楼回调（参考 SmartRefreshLayout TwoLevelHeader），
- * 由业务层自行展示二楼内容（覆盖层/跳转等）；为 null 时二楼不生效
- * @param noMoreDataText 业务层定制的“无更多数据”文案；**不传则终态不展示任何提示 UI**
- * @param header 自定义头部渲染器，默认提供了一个标准的旋转指示器 [SkyClassicsRefreshHeader]
- * @param footer 自定义尾部渲染器，默认提供了一个具备数据穷尽停靠特效的 [SkyClassicsRefreshFooter]
+ * @param state 核心状态机，控制阻尼、开关、位移、状态流转等，通常由 [rememberSkyRefreshState] 创建
+ * @param orientation 排版方向，决定手势拦截轴与 Header/Footer 挂载方位
+ * @param style 下拉刷新侧的位移样式
+ * @param onRefresh 下拉刷新触发的异步回调；需要同时满足 [SkyRefreshState.enableRefresh] 为 `true`
+ * @param onLoadMore 上拉加载触发的异步回调；需要同时满足 [SkyRefreshState.enableLoadMore] 为 `true`
+ * @param secondFloorRate 二楼触发倍率。> 0 时启用“下拉进入二楼”，松手偏移超过 `Header 高度 × secondFloorRate`
+ * 则回调 [onSecondFloor] 而非刷新。默认 0 关闭
+ * @param onSecondFloor 进入二楼回调，由业务层自行展示二楼内容（覆盖层 / 跳转等）。必须同时设置 [secondFloorRate] > 0 才生效
+ * @param noMoreDataText “没有更多数据”文案。为 `null` 时终态不展示任何提示 UI
+ * @param header 自定义头部渲染器，默认 [SkyClassicsRefreshHeader]
+ * @param footer 自定义尾部渲染器，默认 [SkyClassicsRefreshFooter]
  * @param content 支持嵌套滚动事件分发的内容主体
  */
 @Composable
@@ -75,7 +122,7 @@ fun SkyRefreshLayout(
     BoxWithConstraints(modifier = modifier) {
         val containerSize = if (isVertical) constraints.maxHeight else constraints.maxWidth
 
-        // 绑定无状态耦合的嵌套滑动连接器
+        // 构建嵌套滑动连接器，并把业务回调注入状态机，供手势拦截与 autoRefresh/autoLoadMore 共用
         val connection = remember(state, orientation, containerSize, scope, onRefresh, onLoadMore, secondFloorRate, onSecondFloor) {
             // 将业务回调注入状态机，供 autoRefresh / autoLoadMore 程序化触发时派发
             state.refreshAction = { onRefresh?.invoke() }

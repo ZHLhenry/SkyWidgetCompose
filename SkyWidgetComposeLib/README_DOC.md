@@ -8,6 +8,7 @@ SkyWidgetCompose 是一组基于 Jetpack Compose 的通用 UI 组件库，覆盖
 
 - [快速开始](#快速开始)
 - [SkyRefreshLayout（下拉刷新 / 上拉加载）](#skyrefreshlayout下拉刷新--上拉加载)
+- [SkyRefreshPagingLayout（Paging 3 分页刷新）](#skyrefreshpaginglayoutpaging-3-分页刷新)
 - [SkyBadge（徽章）](#skybadge徽章)
 - [SkyGridLayout（静态网格）](#skygridlayout静态网格)
 - [SkySignatureView（签名板）](#skysignatureview签名板)
@@ -35,27 +36,91 @@ dependencies {
 
 ## SkyRefreshLayout（下拉刷新 / 上拉加载）
 
-容器式刷新组件，内部自动托管 `LazyListState`，支持 `LazyColumn` / `LazyRow`。
+容器式刷新组件，基于原生 [Layout] 与 [graphicsLayer] 实现的嵌套滑动刷新/加载容器，
+通过标准的 [NestedScrollConnection] 拦截手势，对 [LazyColumn]、[LazyRow]、[HorizontalPager] 等
+支持嵌套滚动的子组件实现透明包裹。
 
 ### API
 
 ```kotlin
 @Composable
 fun SkyRefreshLayout(
+    modifier: Modifier = Modifier,
     state: SkyRefreshState = rememberSkyRefreshState(),
     orientation: Orientation = Orientation.Vertical,
-    onRefresh: () -> Unit = {},
-    onLoadMore: () -> Unit = {},
-    autoLoadMoreThreshold: Dp = 0.dp,
-    secondFloorRate: Float = 0f,
-    onSecondFloor: () -> Unit = {},
-    noMoreDataText: String? = null,
     style: SkyRefreshStyle = SkyRefreshStyle.Translate,
-    header: @Composable (SkyRefreshState) -> Unit = { SkyClassicsRefreshHeader(state = it) },
-    footer: @Composable (SkyRefreshState) -> Unit = { SkyClassicsRefreshFooter(state = it) },
+    onRefresh: (() -> Unit)? = null,
+    onLoadMore: (() -> Unit)? = null,
+    secondFloorRate: Float = 0f,
+    onSecondFloor: (() -> Unit)? = null,
+    noMoreDataText: String? = null,
+    header: @Composable () -> Unit = { SkyClassicsRefreshHeader(flag = state.refreshFlag, orientation = orientation) },
+    footer: @Composable () -> Unit = { SkyClassicsRefreshFooter(flag = state.loadMoreFlag, noMoreData = state.noMoreData, orientation = orientation, noMoreText = noMoreDataText) },
     content: @Composable () -> Unit
 )
 ```
+
+> **注意**：参数较多时容易遗漏组合条件，下文“属性搭配关系”列出了各能力生效必须同时满足的条件。
+
+### 属性搭配关系（能力生效条件）
+
+以下列出各能力需要同时满足的条件，避免只传部分参数导致功能不生效。
+
+#### 下拉刷新
+
+| 条件 | 说明 |
+|------|------|
+| `state.enableRefresh == true` | 默认为 `true` |
+| `onRefresh != null` | 非空回调 |
+| Header 有实际测量高度 | 默认 [SkyClassicsRefreshHeader] 已满足 |
+
+三者缺一不可。若 `onRefresh` 为空或 `enableRefresh` 被置为 `false`，即使下拉也不会触发任何行为。
+
+#### 上拉加载
+
+| 条件 | 说明 |
+|------|------|
+| `state.enableLoadMore == true` | 默认为 `true` |
+| `onLoadMore != null` | 非空回调 |
+| Footer 有实际测量高度 | 默认 [SkyClassicsRefreshFooter] 已满足 |
+
+三者缺一不可。
+
+#### 无更多数据终态提示
+
+| 条件 | 说明 |
+|------|------|
+| 在 `onLoadMore` 回调中调用 `state.finish(noMoreData = true)` | 标记数据穷尽 |
+| `noMoreDataText != null` | 传入非空文案 |
+
+若只调用了 `finish(noMoreData=true)` 但未传 `noMoreDataText`，Footer 将零尺寸渲染，用户无法看到“没有更多数据”提示。
+
+#### 下拉进入二楼
+
+| 条件 | 说明 |
+|------|------|
+| `secondFloorRate > 0f` | 启用二楼能力，建议 ≥ 1.5f（常用 2.0f） |
+| `onSecondFloor != null` | 二楼触发后的业务回调 |
+
+二级阈值 = **Header 高度 × secondFloorRate**。手指下拉越过该阈值后松手，会回调 `onSecondFloor`，Header 回弹隐藏，**不会触发 `onRefresh`**。
+
+> ⚠️ 当 `secondFloorRate <= 1.0f` 时，二楼阈值 ≤ 普通刷新阈值，普通下拉刷新将无法触发。
+>
+> 二楼场景推荐搭配 [SkyTwoLevelRefreshHeader]，该 Header 会根据下拉进度自动切换文案（释放立即刷新 → 释放进入二楼）。若使用自定义 Header，可监听 `state.indicatorOffset` 自行换算二楼进度。
+
+#### 样式与 Header 的协作
+
+[style] 只影响**下拉刷新侧**的视觉表现：
+
+| Style | 效果 | 推荐搭配的 Header |
+|-------|------|-------------------|
+| `Translate` | Content 跟随下移（默认） | 任意 Header |
+| `FixedContent` | Content 固定，Header 滑入覆盖在 Content 之上 | 任意 Header |
+| `FixedFront` | Header 固定在容器边缘原位，Content 不动，仅 Header 内部动画反馈下拉状态 | 能根据 `indicatorOffset` 驱动进度的 Header，如 [SkyCircleRefreshHeader]、[SkyProgressRefreshHeader] |
+
+#### 程序化触发
+
+通过 `state.autoRefresh()` / `state.autoLoadMore()` 主动触发时，同样需要传入非空的 `onRefresh` / `onLoadMore`，否则不会向业务层派发回调。
 
 ### 基础用法
 
@@ -66,7 +131,6 @@ SkyRefreshLayout(
     state = state,
     onRefresh = { viewModel.refresh() },
     onLoadMore = { viewModel.loadMore() },
-    autoLoadMoreThreshold = 80.dp,
     noMoreDataText = "没有更多数据"
 ) {
     LazyColumn(state = state.listState) {
@@ -81,9 +145,9 @@ SkyRefreshLayout(
 |------|------|
 | `SkyRefreshFlag` | `IDLE` / `PULLING` / `REFRESHING` / `FINISHING` |
 | `SkyRefreshStyle` | `Translate`（内容跟随）、`FixedContent`（内容固定，Header 滑入覆盖）、`FixedFront`（Header 固定边缘原位，绘制在上层） |
-| `state.finish(noMoreData = true)` | 结束加载并标记无更多数据 |
-| `state.autoRefresh()` / `state.autoLoadMore()` | 主动触发刷新 / 加载 |
-| `secondFloorRate` | 大于 0 时，下拉超过 `headerBound × rate` 松手进入二楼 |
+| `state.finish(noMoreData = true)` | 结束加载并标记无更多数据；需配合 `noMoreDataText` 使用 |
+| `state.autoRefresh()` / `state.autoLoadMore()` | 主动触发刷新 / 加载；需配合非空的 `onRefresh` / `onLoadMore` |
+| `secondFloorRate` + `onSecondFloor` | 两者同时设置才启用二楼能力；阈值 = Header 高度 × rate |
 
 ### Header / Footer 定制
 
@@ -97,7 +161,95 @@ SkyRefreshLayout(
 - `SkyCircleRefreshHeader`
 - `SkyProgressRefreshHeader`
 - `SkyTimeRefreshHeader`
-- `SkyTwoLevelRefreshHeader`
+- `SkyTwoLevelRefreshHeader`（推荐用于二楼场景）
+
+---
+
+## SkyRefreshPagingLayout（配合 Paging 3 使用）
+
+在 [SkyRefreshLayout] 之上封装的 **Paging 3 开箱即用列表容器**。内部自动完成三件事：
+
+1. 下拉触发 `LazyPagingItems.refresh()`；
+2. 滚动到底由 Paging 自动加载下一页（`onLoadMore` 默认无需手动处理）；
+3. 监听 `LoadState`，在加载结束后自动调用 `state.finish(noMoreData)` 复位动画，并在列表尾部渲染「加载中 / 加载失败（点击重试）/ 没有更多数据」。
+
+> 容器本身不感知数据来源，所有样式、Header/Footer、覆盖层插槽均透传给 [SkyRefreshLayout]，
+> 非 Paging 用法完全不受影响。
+
+### 依赖
+
+Paging 在库中为 `compileOnly` 依赖，**与 `SkyLottieRefreshHeader` 的 Lottie 处理方式一致，不会传递给消费者**。
+使用前需在宿主模块自行导包：
+
+```toml
+androidx-paging-compose = { group = "androidx.paging", name = "paging-compose", version.ref = "pagingCompose" }
+```
+
+```kotlin
+// 消费者模块 build.gradle.kts
+dependencies {
+    implementation(libs.androidx.paging.compose)
+}
+```
+
+组件内部对 Paging 相关类做有运行时检查；若运行期缺失依赖会抛出 `IllegalStateException`
+并附带明确的导包提示，便于快速定位。
+
+### 基础用法
+
+```kotlin
+// ViewModel 侧：暴露 PagingData 流（Pager + PagingSource 自行实现）
+val articles: Flow<PagingData<ArticleBean>> = pager.flow.cachedIn(viewModelScope)
+
+// Composable 侧
+val lazyPagingItems = viewModel.articles.collectAsLazyPagingItems()
+
+SkyRefreshPagingLayout(
+    lazyPagingItems = lazyPagingItems,
+    itemKey = { it.id },
+    content = { article -> ArticleItem(article) }
+)
+```
+
+### 关键 API
+
+| 名称 | 说明 |
+|------|------|
+| `SkyRefreshPagingLayout` | 封装好的 Paging 列表容器，直接传 `lazyPagingItems` + `content` |
+| `rememberSkyRefreshPagingState()` | Paging 场景下的刷新状态（等价于 `rememberSkyRefreshState()` 的语义别名） |
+| `SkyRefreshState.bindPaging(lazyPagingItems)` | 仅把 Paging 的 `LoadState` 绑定到刷新状态，供需要自定义列表结构时使用 |
+| `onRefresh` / `onLoadMore` | 可选自定义回调；为 null 时分别使用 `lazyPagingItems.refresh()` 和 Paging 自动加载 |
+
+### 自定义列表结构（进阶）
+
+若不想用内置 `LazyColumn`，可自行组合 [SkyRefreshLayout] 与 `bindPaging`：
+
+```kotlin
+val state = rememberSkyRefreshPagingState()
+state.bindPaging(lazyPagingItems)
+
+SkyRefreshLayout(
+    state = state,
+    onRefresh = { lazyPagingItems.refresh() }
+) {
+    LazyVerticalGrid(columns = GridCells.Fixed(2)) {
+        items(lazyPagingItems.itemCount) { index ->
+            lazyPagingItems[index]?.let { Item(it) }
+        }
+    }
+}
+```
+
+---
+
+### 属性搭配关系
+
+| 能力 | 生效条件 |
+|------|----------|
+| 下拉刷新 | `onRefresh` 为 null 时由 `LazyPagingItems.refresh()` 自动接管；非空则走自定义逻辑 |
+| 上拉加载 | 由 Paging 自动分页，无需设置 `onLoadMore`；非空时改为自定义逻辑 |
+| 无更多数据终态 | 依赖 `loadState.append.endOfPaginationReached` + 非空 `noMoreDataText`（默认即有） |
+| 二楼 | `secondFloorRate > 0` 且 `onSecondFloor != null`，见 [SkyRefreshLayout] |
 
 ---
 
@@ -127,7 +279,7 @@ fun SkyBadgeBox(
     onDragStateChanged: ((Int) -> Unit)? = null,
     badge: @Composable (SkyBadgeState) -> Unit = { DefaultSkyBadgeContent(it) },
     content: @Composable () -> Unit
-)
+:)
 ```
 
 ### 基础用法
@@ -199,7 +351,7 @@ fun <T> SkyGridLayout(
     verticalSpacing: Dp = 8.dp,
     contentPadding: PaddingValues = PaddingValues(0.dp),
     itemContent: @Composable (item: T) -> Unit
-)
+:)
 ```
 
 ### 用法
@@ -285,10 +437,11 @@ Button(onClick = {
 fun SkyPageStateLayout(
     pageState: SkyPageState,
     modifier: Modifier = Modifier,
-    onRetry: () -> Unit = {},
+    onEmptyRetry: () -> Unit = {},
+    onErrorRetry: () -> Unit = {},
     loading: @Composable () -> Unit = { SkyLoadingWidget() },
-    empty: @Composable (message: String) -> Unit = { SkyEmptyWidget(message = it, onRetry = onRetry) },
-    error: @Composable (message: String) -> Unit = { SkyErrorWidget(message = it, onRetry = onRetry) },
+    empty: @Composable (message: String) -> Unit = { SkyEmptyWidget(message = it, onRetry = onEmptyRetry) },
+    error: @Composable (message: String) -> Unit = { SkyErrorWidget(message = it, onRetry = onErrorRetry) },
     content: @Composable () -> Unit
 )
 ```
@@ -300,7 +453,8 @@ val state by viewModel
 
 SkyPageStateLayout(
     pageState = state.pageState,
-    onRetry = { viewModel.load() }
+    onEmptyRetry = { viewModel.load() },   // Empty 占位点击重试
+    onErrorRetry = { viewModel.load() }    // Error 占位点击重试
 ) {
     LazyColumn {
         items(state.datas) { ArticleItem(it) }
@@ -311,8 +465,8 @@ SkyPageStateLayout(
 ### 占位组件
 
 - `SkyLoadingWidget`：居中转圈
-- `SkyEmptyWidget(message, image, onRetry)`：空数据占位
-- `SkyErrorWidget(message, image, onRetry)`：错误占位
+- `SkyEmptyWidget(message, image, onRetry)`：空数据占位，`onRetry` 对应 `onEmptyRetry`
+- `SkyErrorWidget(message, image, onRetry)`：错误占位，`onRetry` 对应 `onErrorRetry`
 
 ### 状态说明
 

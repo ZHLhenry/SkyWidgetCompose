@@ -52,7 +52,8 @@ import androidx.compose.ui.Modifier
  *
  *     SkyPageStateLayout(
  *         pageState = state.pageState,
- *         onRetry = { viewModel.load() }
+ *         onEmptyRetry = { viewModel.load() },
+ *         onErrorRetry = { viewModel.load() }
  *     ) {
  *         LazyColumn {
  *             items(state.datas) { article ->
@@ -68,7 +69,8 @@ import androidx.compose.ui.Modifier
  * ```kotlin
  * SkyPageStateLayout(
  *     pageState = state.pageState,
- *     onRetry = { viewModel.load() },
+ *     onEmptyRetry = { viewModel.load() },
+ *     onErrorRetry = { viewModel.load() },
  *     empty = { message ->
  *         SkyEmptyWidget(
  *             image = {
@@ -97,7 +99,8 @@ import androidx.compose.ui.Modifier
  *
  * @param pageState 当前页面状态
  * @param modifier 外层修饰符
- * @param onRetry 重试回调（空 / 错误占位按钮共用）
+ * @param onEmptyRetry 空态占位按钮重试回调（默认空实现）
+ * @param onErrorRetry 错误态占位按钮重试回调（默认空实现）
  * @param loading 加载态自定义内容，默认 [SkyLoadingWidget]
  * @param empty 空态自定义内容，默认 [SkyEmptyWidget]
  * @param error 错误态自定义内容，默认 [SkyErrorWidget]
@@ -107,13 +110,14 @@ import androidx.compose.ui.Modifier
 fun SkyPageStateLayout(
     pageState: SkyPageState,
     modifier: Modifier = Modifier,
-    onRetry: () -> Unit = {},
+    onEmptyRetry: () -> Unit = {},
+    onErrorRetry: () -> Unit = {},
     loading: @Composable () -> Unit = { SkyLoadingWidget() },
     empty: @Composable (message: String) -> Unit = {
-        SkyEmptyWidget(message = it, onRetry = onRetry)
+        SkyEmptyWidget(message = it, onRetry = onEmptyRetry)
     },
     error: @Composable (message: String) -> Unit = {
-        SkyErrorWidget(message = it, onRetry = onRetry)
+        SkyErrorWidget(message = it, onRetry = onErrorRetry)
     },
     content: @Composable () -> Unit
 ) {

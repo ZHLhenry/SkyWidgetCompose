@@ -1,12 +1,14 @@
 [versions]
 skyBuildLogic = "1.2.3"
-skyWidgetCompose = "1.0.1"
+skyWidgetCompose = "1.0.2"
 activityCompose = "1.13.0"
 lottieCompose = "6.7.1"
+pagingCompose = "3.3.6"
 
 [libraries]
 # 必须库
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
+androidx-paging-compose = { group = "androidx.paging", name = "paging-compose", version.ref = "pagingCompose" }
 
 # 非必须库
 androidx-compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
