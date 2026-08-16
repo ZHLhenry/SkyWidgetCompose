@@ -1,6 +1,7 @@
 package com.sky.widget.sample
 
 import android.graphics.Bitmap
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -35,13 +36,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import com.sky.mvi.core.compose.SkyMviScreen
+import com.sky.widget.sample.signature.SignatureUiIntent
+import com.sky.widget.sample.signature.SignatureViewModel
 import com.sky.widget.sample.ui.theme.SkyWidgetComposeTheme
 import com.sky.widget.signatureView.SkySignatureView
-import com.sky.widget.signatureView.SkySignatureViewState
 import com.sky.widget.signatureView.rememberSkySignatureViewState
 
 /**
- * 签名板示例页。
+ * 签名板示例页（SkyMVI 改造版）。
+ *
+ * "是否有笔迹"由 [SignatureViewModel] 持有（通过 [SignatureUiIntent] 同步），
+ * 笔迹本身与保存后的 Bitmap 预览属于瞬时 UI 数据，留在 UI 层由 SkySignatureViewState 管理。
  *
  * 演示：
  * - 手写签名
@@ -51,7 +58,19 @@ import com.sky.widget.signatureView.rememberSkySignatureViewState
  */
 @Composable
 fun SignatureDemoScreen(onBack: () -> Unit) {
-    val state: SkySignatureViewState = rememberSkySignatureViewState()
+    SkyMviScreen(
+        viewModel = hiltViewModel<SignatureViewModel>(),
+    ) { _, intent ->
+        SignatureDemoContent(intent = intent, onBack = onBack)
+    }
+}
+
+@Composable
+private fun SignatureDemoContent(
+    intent: (SignatureUiIntent) -> Unit,
+    onBack: () -> Unit,
+) {
+    val state = rememberSkySignatureViewState()
     var savedBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var selectedColorIndex by remember { mutableIntStateOf(0) }
 
@@ -134,6 +153,7 @@ fun SignatureDemoScreen(onBack: () -> Unit) {
                     onClick = {
                         state.clear()
                         savedBitmap = null
+                        intent(SignatureUiIntent.Clear)
                     },
                     modifier = Modifier.weight(1f),
                     enabled = !state.isEmpty
@@ -143,6 +163,7 @@ fun SignatureDemoScreen(onBack: () -> Unit) {
                 Button(
                     onClick = {
                         savedBitmap = state.save(backgroundColor = Color.White)
+                        intent(SignatureUiIntent.Saved(savedBitmap?.toString()))
                     },
                     modifier = Modifier.weight(1f),
                     enabled = !state.isEmpty
@@ -164,7 +185,7 @@ fun SignatureDemoScreen(onBack: () -> Unit) {
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(Modifier.height(8.dp))
-                    androidx.compose.foundation.Image(
+                    Image(
                         bitmap = savedBitmap!!.asImageBitmap(),
                         contentDescription = "签名预览",
                         modifier = Modifier

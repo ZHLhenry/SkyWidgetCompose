@@ -1,19 +1,24 @@
 [versions]
 skyBuildLogic = "1.2.3"
-skyWidgetCompose = "1.0.2"
+skymvi = "1.0.1"
+skyWidgetCompose = "1.0.3"
 activityCompose = "1.13.0"
 lottieCompose = "6.7.1"
 pagingCompose = "3.3.6"
+hiltLifecycleViewModelCompose = "1.4.0"
 
 [libraries]
 # 必须库
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
-androidx-paging-compose = { group = "androidx.paging", name = "paging-compose", version.ref = "pagingCompose" }
 
 # 非必须库
 androidx-compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
 lottie-compose = { group = "com.airbnb.android", name = "lottie-compose", version.ref = "lottieCompose" }
 skyWidgetCompose = { module = "com.sky.lib:SkyWidgetCompose", version.ref = "skyWidgetCompose" }
+androidx-paging-compose = { group = "androidx.paging", name = "paging-compose", version.ref = "pagingCompose" }
+
+skymvi = { module = "com.sky.lib:SkyMVI", version.ref = "skymvi" }
+hilt-lifecycle-viewmodel-compose = { group = "androidx.hilt", name = "hilt-lifecycle-viewmodel-compose", version.ref = "hiltLifecycleViewModelCompose" }
 
 [plugins]
 # 必须插件

@@ -15,6 +15,8 @@ SkyWidgetCompose 是一组基于 Jetpack Compose 的通用 UI 组件库，覆盖
 - [SkyPageStateLayout（页面状态布局）](#skypagestatelayout页面状态布局)
 - [SkyAnnotatedText（高亮文本）](#skyannotatedtext高亮文本)
 - [SkyMarqueeView（跑马灯 / 轮播）](#skymarqueeview跑马灯--轮播)
+- [SkyIconFont（图标字体）](#skyiconfont图标字体)
+- [SkyPercentImage（按比例图片）](#skypercentimage按比例图片)
 
 ---
 
@@ -572,6 +574,152 @@ state.setCurrentIndex(index, items.size)
 
 - 只有一条数据时不轮播，但仍展示内容
 - `onItemClick` 为 null 时，点击内容暂停 / 继续；传入时派发点击事件不自动暂停
+
+---
+
+## SkyIconFont（图标字体）
+
+纯 Compose 重写自原仓库 `SkyWidget/iconfont`，不依赖 mikepenz/iconics 等三方图标库，
+使用 Compose `Text` + 原生 `Typeface` / `FontFamily` 渲染 iconfont.cn 导出的图标字体。支持多字体并存与按需混用。
+
+### 资源准备
+
+将 TTF 字体与同名 JSON 映射文件一同放入宿主模块的 `assets/fonts/`：
+
+```
+app/src/main/assets/fonts/
+├── sky_iconfont.ttf
+├── sky_iconfont.json
+├── adb_iconfont.ttf
+└── adb_iconfont.json
+```
+
+- **TTF**：iconfont.cn 下载的字体文件。
+- **JSON**：iconfont.cn 导出标准 JSON（含 `name` / `css_prefix_text` / `description` / `glyphs[font_class, unicode]`）。
+  JSON 文件名需与 TTF 同名（仅扩展名不同），由 TTF 路径自动推导。
+
+### 初始化
+
+在 `Application.onCreate` 中注册（第一个注册的字体为默认字体）：
+
+```kotlin
+class SampleApp : Application() {
+    override fun onCreate() {
+        super.onCreate()
+        SkyIconFontsLib.initRegister(
+            this,
+            ttfPaths = listOf(
+                "fonts/sky_iconfont.ttf",
+                "fonts/adb_iconfont.ttf"
+            )
+        )
+    }
+}
+```
+
+多字体设计：内部按「字体文件名精确匹配 → JSON name 精确匹配 → css 前缀匹配 → 默认字体」四级解析；
+所有查询方法均带可选 `fontName` 参数，不传时路由到默认字体。
+
+### 基础用法
+
+```kotlin
+// 使用默认字体
+SkyIconFont(
+    iconName = "sky-fenxiang",
+    tint = Color.Red,
+    fontSize = 24.sp
+)
+
+// 指定字体（fontName 为 TTF 文件名，不含扩展名）
+SkyIconFont(
+    iconName = "adb-device",
+    fontName = "adb_iconfont",
+    tint = Color.Red
+)
+```
+
+> 图标名称需带前缀（如 `sky-fenxiang`），前缀来自 JSON 的 `css_prefix_text`。
+> 若名称不存在，回落渲染红色 `?` 占位，便于排查映射缺失。
+
+### 动态切换（状态）
+
+当图标需随业务状态（切换图标 / 颜色 / 字号）动态变化时，使用可观察状态：
+
+```kotlin
+val iconState = rememberSkyIconFontState(iconName = "sky-fenxiang", tint = Color.Red)
+
+// 在 VM / UI 中调用即可驱动重组
+iconState.setIcon("sky-share")
+iconState.setTint(Color.Blue)
+
+SkyIconFont(state = iconState)
+```
+
+### 公开查询 API
+
+| 方法 | 说明 |
+|------|------|
+| `initRegister(application, ttfPaths)` | 注册字体（建议 Application 中调用），首个为默认字体 |
+| `isInitialized` | 是否已注册字体 |
+| `getRegisteredFonts()` | 所有已注册字体摘要（名称 / 前缀 / 图标数） |
+| `iconNames(fontName?)` | 指定字体的全部图标名称（已排序） |
+| `getIconChar(name, fontName?)` | 名称 → Unicode 字符，不存在返回 null |
+| `isIconExists(name, fontName?)` | 图标是否存在 |
+| `fontName(fontName?) / iconCount(fontName?) / mappingPrefix(fontName?)` | 字体名称 / 图标数量 / css 前缀 |
+| `getSkyIconFontInfoJson(fontName?)` | 输出字体完整信息 JSON（含全部图标映射） |
+
+---
+
+## SkyPercentImage（按比例图片）
+
+纯 Compose 重写自原仓库 `SkyWidget/image/SkyPercentImageView`（View 体系），不依赖 Android View。
+按宽度或高度为基准，根据比例自动计算另一维度的尺寸，常用于封面图、头像等固定比例场景。
+
+### API
+
+```kotlin
+@Composable
+fun SkyPercentImage(
+    modifier: Modifier = Modifier,
+    painter: Painter,                       // 必需：图片源（本地 / 矢量 / 网络等）
+    contentDescription: String? = null,
+    basics: SkyPercentBasics = SkyPercentBasics.Width,
+    percent: Float = 1f,
+    alignment: Alignment = Alignment.Center,
+    contentScale: ContentScale = ContentScale.Crop
+)
+```
+
+`SkyPercentBasics` 枚举：
+
+- `Width`（默认）：高度 = 宽度 × `percent`
+- `Height`：宽度 = 高度 × `percent`
+
+### 用法
+
+```kotlin
+// 以宽度为基准，高度 = 宽度 × 0.5（即 2:1 比例）
+SkyPercentImage(
+    painter = painterResource(id = R.drawable.ic_sample_cover),
+    basics = SkyPercentBasics.Width,
+    percent = 0.5f,
+    modifier = Modifier.fillMaxWidth()
+)
+
+// 以高度为基准，宽度 = 高度 × 0.75
+SkyPercentImage(
+    painter = rememberAsyncImagePainter("https://example.com/avatar.png"),
+    basics = SkyPercentBasics.Height,
+    percent = 0.75f,
+    modifier = Modifier.fillMaxHeight()
+)
+```
+
+### 特点
+
+- 纯图片组件，内部直接 `Image(painter, ...)`；`painter` 必需且支持任意图片源（含 Coil 的 `rememberAsyncImagePainter`）。
+- 测量受父约束 min/max 钳制；`percent` 经 `coerceAtLeast(0f)` 兜底，避免非法比例。
+- `modifier` 位于第一参数，符合 Compose 约定；尺寸由基准维与比例共同决定，无需额外 `content` 插槽。
 
 ---
 

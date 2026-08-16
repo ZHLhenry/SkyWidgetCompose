@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import dagger.hilt.android.AndroidEntryPoint
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -37,6 +38,7 @@ import androidx.compose.ui.unit.sp
 import com.sky.widget.grid.SkyGridLayout
 import com.sky.widget.sample.ui.theme.SkyWidgetComposeTheme
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -64,7 +66,8 @@ fun AppRoot() {
     // 非首页时拦截返回按钮
     BackHandler(enabled = currentPage != Screen.Home) {
         currentPage = when (currentPage) {
-            Screen.Refresh, Screen.StateLayout, Screen.Signature, Screen.AnnotatedText, Screen.Grid, Screen.Marquee, Screen.Badge -> Screen.Home
+            Screen.Refresh, Screen.StateLayout, Screen.Signature, Screen.AnnotatedText,
+            Screen.Grid, Screen.Marquee, Screen.Badge, Screen.IconFont, Screen.Image -> Screen.Home
             else -> Screen.Refresh
         }
     }
@@ -90,12 +93,15 @@ fun AppRoot() {
         Screen.TimeHeader -> TimeHeaderDemoScreen(onBack = { currentPage = Screen.Refresh })
         Screen.SecondFloor -> SecondFloorDemoScreen(onBack = { currentPage = Screen.Refresh })
         Screen.CustomSecondFloor -> CustomSecondFloorDemoScreen(onBack = { currentPage = Screen.Refresh })
+        Screen.RefreshGrid -> GridRefreshDemoScreen(onBack = { currentPage = Screen.Refresh })
         Screen.StateLayout -> StateLayoutDemoScreen(onBack = { currentPage = Screen.Home })
         Screen.Signature -> SignatureDemoScreen(onBack = { currentPage = Screen.Home })
         Screen.AnnotatedText -> AnnotatedTextDemoScreen(onBack = { currentPage = Screen.Home })
-            Screen.Grid -> GridDemoScreen(onBack = { currentPage = Screen.Home })
-            Screen.Marquee -> MarqueeDemoScreen(onBack = { currentPage = Screen.Home })
-            Screen.Badge -> BadgeDemoScreen(onBack = { currentPage = Screen.Home })
+        Screen.Grid -> GridDemoScreen(onBack = { currentPage = Screen.Home })
+        Screen.Marquee -> MarqueeDemoScreen(onBack = { currentPage = Screen.Home })
+        Screen.Badge -> BadgeDemoScreen(onBack = { currentPage = Screen.Home })
+        Screen.IconFont -> IconFontDemoScreen(onBack = { currentPage = Screen.Home })
+        Screen.Image -> ImageDemoScreen(onBack = { currentPage = Screen.Home })
     }
 }
 
@@ -117,12 +123,15 @@ sealed interface Screen {
     data object TimeHeader : Screen
     data object SecondFloor : Screen
     data object CustomSecondFloor : Screen
+    data object RefreshGrid : Screen
     data object StateLayout : Screen
     data object Signature : Screen
     data object AnnotatedText : Screen
     data object Grid : Screen
     data object Marquee : Screen
     data object Badge : Screen
+    data object IconFont : Screen
+    data object Image : Screen
 }
 
 /**
@@ -149,20 +158,15 @@ fun HomeScreen(onNavigate: (Screen) -> Unit) {
         }
 
         val components = listOf(
-            ComponentItem("角标", "\uD83D\uDCC5"),
-            ComponentItem("图标字体", "T"),
-            ComponentItem("比例图片", "\uD83D\uDDBC"),
-            ComponentItem("圆形图片", "\uD83C\uDFAF"),
-            ComponentItem("底部导航", "\uD83D\uDCC5"),
-            ComponentItem("文字滚动", "\uD83D\uDCDD"),
-            ComponentItem("签名板", "\u270F\uFE0F"),
-            ComponentItem("二维码", "\uD83D\uDCF6"),
-            ComponentItem("刷新示例", "\uD83D\uDCC5"),
-            ComponentItem("页面状态", "\uD83D\uDCCE"),
-            ComponentItem("高亮文字", "\uD83D\uDD8A"),
-            ComponentItem("网格布局", "\uD83D\uDCD0"),
-            ComponentItem("跑马灯", "\uD83D\uDCDD"),
-            ComponentItem("徽章", "\uD83C\uDFF7\uFE0F"),
+            ComponentItem("刷新示例", "\uD83D\uDD04"),      // 🔄 刷新箭头
+            ComponentItem("页面状态", "\uD83D\uDCC4"),      // 📄 页面/文档状态
+            ComponentItem("签名板", "\u270D\uFE0F"),        // ✍️ 手写签名
+            ComponentItem("高亮文字", "\uD83D\uDD8D"),      // 🖍️ 高亮标记
+            ComponentItem("网格布局", "\u229E"),            // ⊞ 网格符号
+            ComponentItem("跑马灯", "\uD83D\uDCDC"),        // 📜 滚动内容
+            ComponentItem("徽章", "\uD83D\uDD34"),          // 🔴 红点徽标
+            ComponentItem("图标字体", "\uD83D\uDD24"),      // 🔤 图标/字母
+            ComponentItem("按比例图片", "\uD83D\uDDBC️"),   // 🖼️ 图片比例
         )
 
         SkyGridLayout(
@@ -184,6 +188,8 @@ fun HomeScreen(onNavigate: (Screen) -> Unit) {
                         "网格布局" -> onNavigate(Screen.Grid)
                         "跑马灯" -> onNavigate(Screen.Marquee)
                         "徽章" -> onNavigate(Screen.Badge)
+                        "图标字体" -> onNavigate(Screen.IconFont)
+                        "按比例图片" -> onNavigate(Screen.Image)
                     }
                 }
             )

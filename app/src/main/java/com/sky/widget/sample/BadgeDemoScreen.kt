@@ -27,6 +27,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -42,35 +43,59 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import com.sky.mvi.core.compose.SkyMviScreen
 import com.sky.widget.badge.SkyBadgeBox
 import com.sky.widget.badge.SkyBadgeDragState
 import com.sky.widget.badge.SkyBadgeGravity
 import com.sky.widget.badge.SkyBadgeState
 import com.sky.widget.badge.SkyBadgeView
 import com.sky.widget.badge.rememberSkyBadgeState
+import com.sky.widget.sample.badge.BadgeUiIntent
+import com.sky.widget.sample.badge.BadgeViewModel
 import com.sky.widget.sample.ui.theme.SkyWidgetComposeTheme
 
 /**
- * 徽章（Badge）示例页。
+ * 徽章（Badge）示例页（SkyMVI 改造版）。
  *
- * 演示：
- * - 数字 / 文本 / 圆点徽章
- * - 九宫格方位对齐
- * - 拖拽消除与状态回调
- * - 颜色 / 边框 / 阴影样式切换
+ * 页面级状态（主徽章数字、方位选择、独立徽章数字、样式索引）由 [BadgeViewModel]
+ * 持有并通过 [SkyMviScreen] 下发；徽章的瞬时动画（拖拽消除）由 SkyBadgeState 自身
+ * 负责，这里用 LaunchedEffect 将 UiState 同步到 SkyBadgeState。
+ *
+ * 演示：数字 / 文本 / 圆点徽章、九宫格方位、拖拽消除、颜色 / 边框 / 阴影样式切换。
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun BadgeDemoScreen(onBack: () -> Unit) {
+    SkyMviScreen(
+        viewModel = hiltViewModel<BadgeViewModel>(),
+    ) { state, intent ->
+        BadgeDemoContent(state = state, intent = intent, onBack = onBack)
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun BadgeDemoContent(
+    state: com.sky.widget.sample.badge.BadgeUiState,
+    intent: (BadgeUiIntent) -> Unit,
+    onBack: () -> Unit,
+) {
     val context = LocalContext.current
     val scrollState = rememberScrollState()
 
-    val numberState: SkyBadgeState = rememberSkyBadgeState(initialNumber = 5)
+    val numberState: SkyBadgeState = rememberSkyBadgeState(initialNumber = state.badgeNumber)
     val positionState: SkyBadgeState = rememberSkyBadgeState(initialNumber = 8)
     val styleState: SkyBadgeState = rememberSkyBadgeState(initialNumber = 12)
+    val standaloneState: SkyBadgeState = rememberSkyBadgeState(initialNumber = 7)
 
-    var currentGravity by remember { mutableStateOf(SkyBadgeGravity.TOP_END) }
     var dragStatus by remember { mutableStateOf("未拖拽") }
+
+    // 将 UiState 的主徽章 / 独立徽章数字同步到 SkyBadgeState
+    LaunchedEffect(state.badgeNumber) { numberState.number = state.badgeNumber }
+    LaunchedEffect(state.standaloneNumber) { standaloneState.number = state.standaloneNumber }
+
+    val currentGravity = SkyBadgeGravity.entries.getOrElse(state.gravityIndex) { SkyBadgeGravity.TOP_END }
 
     Column(modifier = Modifier.fillMaxSize()) {
         // 顶部标题栏
@@ -114,11 +139,11 @@ fun BadgeDemoScreen(onBack: () -> Unit) {
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         OutlinedButton(
-                            onClick = { numberState.number += 1 },
+                            onClick = { intent(BadgeUiIntent.AddBadge) },
                             contentPadding = PaddingValues(vertical = 6.dp)
                         ) { Text("+1", fontSize = 13.sp) }
                         OutlinedButton(
-                            onClick = { numberState.number = (numberState.number - 1).coerceAtLeast(-1) },
+                            onClick = { intent(BadgeUiIntent.MinusBadge) },
                             contentPadding = PaddingValues(vertical = 6.dp)
                         ) { Text("-1", fontSize = 13.sp) }
                         OutlinedButton(
@@ -177,7 +202,7 @@ fun BadgeDemoScreen(onBack: () -> Unit) {
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        SkyBadgeGravity.entries.forEach { gravity ->
+                        SkyBadgeGravity.entries.forEachIndexed { index, gravity ->
                             val label = when (gravity) {
                                 SkyBadgeGravity.TOP_START -> "左上"
                                 SkyBadgeGravity.TOP_CENTER -> "中上"
@@ -189,15 +214,20 @@ fun BadgeDemoScreen(onBack: () -> Unit) {
                                 SkyBadgeGravity.BOTTOM_CENTER -> "中下"
                                 SkyBadgeGravity.BOTTOM_END -> "右下"
                             }
+                            val selected = state.gravityIndex == index
                             OutlinedButton(
                                 onClick = {
-                                    currentGravity = gravity
+                                    intent(BadgeUiIntent.SelectGravity(index))
                                     positionState.reset((1..20).random())
                                     dragStatus = "未拖拽"
                                 },
                                 contentPadding = PaddingValues(vertical = 6.dp)
                             ) {
-                                Text(label, fontSize = 12.sp)
+                                Text(
+                                    label,
+                                    fontSize = 12.sp,
+                                    color = if (selected) Color(0xFF1976D2) else Color(0xFF666666)
+                                )
                             }
                         }
                     }
@@ -219,8 +249,8 @@ fun BadgeDemoScreen(onBack: () -> Unit) {
                             backgroundColor = Color(0xFFFF9800),
                             draggable = true,
                             maxDragDistance = 90.dp,
-                            onDragStateChanged = { state ->
-                                dragStatus = when (state) {
+                            onDragStateChanged = { s ->
+                                dragStatus = when (s) {
                                     SkyBadgeDragState.START -> "开始拖拽"
                                     SkyBadgeDragState.DRAGGING -> "拖拽中"
                                     SkyBadgeDragState.DRAGGING_OUT_OF_RANGE -> "超出范围"
@@ -312,19 +342,17 @@ fun BadgeDemoScreen(onBack: () -> Unit) {
 
             // 示例 4：独立使用 SkyBadgeView
             DemoCard(title = "独立 SkyBadgeView") {
-                val standaloneState = rememberSkyBadgeState(initialNumber = 7)
-
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         OutlinedButton(
-                            onClick = { standaloneState.number = (1..50).random() },
+                            onClick = { intent(BadgeUiIntent.AddStandalone) },
                             contentPadding = PaddingValues(vertical = 6.dp)
                         ) { Text("随机数字", fontSize = 13.sp) }
                         OutlinedButton(
-                            onClick = { standaloneState.setBadgeText(if (standaloneState.text == null) "VIP" else null) },
+                            onClick = { intent(BadgeUiIntent.MinusStandalone) },
                             contentPadding = PaddingValues(vertical = 6.dp)
                         ) { Text("切换 VIP", fontSize = 13.sp) }
                         OutlinedButton(

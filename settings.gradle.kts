@@ -61,6 +61,7 @@ dependencyResolutionManagement {
                 url = uri(repoUrl)
             }
         }
+        aliyunMaven("https://packages.aliyun.com/6732fc8f356ccaf8531a1487/maven/skymvi")
         aliyunMaven("https://packages.aliyun.com/6732fc8f356ccaf8531a1487/maven/skywidgetcompose")
         aliyunMaven("https://packages.aliyun.com/6732fc8f356ccaf8531a1487/maven/skybuildlogic")
         maven("${rootDir}/build/repo")

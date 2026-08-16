@@ -20,7 +20,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -29,12 +28,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,11 +36,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.sky.widget.sample.ui.theme.SkyWidgetComposeTheme
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import com.sky.mvi.core.compose.SkyMviScreen
 import com.sky.widget.grid.SkyGridLayout
+import com.sky.widget.sample.grid.GridUiIntent
+import com.sky.widget.sample.grid.GridViewModel
+import com.sky.widget.sample.ui.theme.SkyWidgetComposeTheme
 
 /**
- * 网格布局示例页。
+ * 网格布局示例页（SkyMVI 改造版）。
+ *
+ * 列数 / 间距 / 内边距与点击反馈由 [GridViewModel] 持有，通过 [SkyMviScreen] 下发；
+ * 控制面板与网格渲染根据 UiState 重建。
  *
  * 演示：
  * - 基础 2 列网格
@@ -56,13 +56,21 @@ import com.sky.widget.grid.SkyGridLayout
  */
 @Composable
 fun GridDemoScreen(onBack: () -> Unit) {
-    val context = LocalContext.current
+    SkyMviScreen(
+        viewModel = hiltViewModel<GridViewModel>(),
+    ) { state, intent ->
+        GridDemoContent(state = state, intent = intent, onBack = onBack)
+    }
+}
+
+@Composable
+private fun GridDemoContent(
+    state: com.sky.widget.sample.grid.GridUiState,
+    intent: (GridUiIntent) -> Unit,
+    onBack: () -> Unit,
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val scrollState = rememberScrollState()
-    var columns by remember { mutableIntStateOf(2) }
-    var horizontalSpacing by remember { mutableIntStateOf(8) }
-    var verticalSpacing by remember { mutableIntStateOf(8) }
-    var padding by remember { mutableIntStateOf(16) }
-    var lastClick by remember { mutableStateOf<String?>(null) }
 
     Column(modifier = Modifier.fillMaxSize()) {
         // 顶部标题栏
@@ -100,17 +108,17 @@ fun GridDemoScreen(onBack: () -> Unit) {
         ) {
             // 控制面板
             ControlPanel(
-                columns = columns,
-                onColumnsChange = { columns = it },
-                horizontalSpacing = horizontalSpacing,
-                onHorizontalSpacingChange = { horizontalSpacing = it },
-                verticalSpacing = verticalSpacing,
-                onVerticalSpacingChange = { verticalSpacing = it },
-                padding = padding,
-                onPaddingChange = { padding = it }
+                columns = state.columns,
+                onColumnsChange = { intent(GridUiIntent.SetColumns(it)) },
+                horizontalSpacing = state.horizontalSpacing,
+                onHorizontalSpacingChange = { intent(GridUiIntent.SetHorizontalSpacing(it)) },
+                verticalSpacing = state.verticalSpacing,
+                onVerticalSpacingChange = { intent(GridUiIntent.SetVerticalSpacing(it)) },
+                padding = state.contentPadding,
+                onPaddingChange = { intent(GridUiIntent.SetContentPadding(it)) }
             )
 
-            lastClick?.let { click ->
+            state.lastClick?.let { click ->
                 Text(
                     text = click,
                     fontSize = 14.sp,
@@ -120,13 +128,13 @@ fun GridDemoScreen(onBack: () -> Unit) {
             }
 
             // 示例 1：基础色块网格
-            DemoCard(title = "基础色块网格（columns = $columns）") {
+            DemoCard(title = "基础色块网格（columns = ${state.columns}）") {
                 SkyGridLayout(
                     items = List(6) { it + 1 },
-                    columns = columns,
-                    horizontalSpacing = horizontalSpacing.dp,
-                    verticalSpacing = verticalSpacing.dp,
-                    contentPadding = PaddingValues(padding.dp)
+                    columns = state.columns,
+                    horizontalSpacing = state.horizontalSpacing.dp,
+                    verticalSpacing = state.verticalSpacing.dp,
+                    contentPadding = PaddingValues(state.contentPadding.dp)
                 ) { index ->
                     Box(
                         modifier = Modifier
@@ -136,7 +144,7 @@ fun GridDemoScreen(onBack: () -> Unit) {
                             .background(colorForIndex(index))
                             .clickable {
                                 val msg = "点击了色块 $index"
-                                lastClick = msg
+                                intent(GridUiIntent.ClickItem(msg))
                                 Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                             },
                         contentAlignment = Alignment.Center
@@ -176,7 +184,7 @@ fun GridDemoScreen(onBack: () -> Unit) {
                             .background(Color(0xFFF5F5F5))
                             .clickable {
                                 val msg = "点击了商品 ${product.name}"
-                                lastClick = msg
+                                intent(GridUiIntent.ClickItem(msg))
                                 Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                             }
                             .padding(12.dp),

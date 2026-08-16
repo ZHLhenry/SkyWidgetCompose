@@ -1,0 +1,44 @@
+{
+  "id": "5212040",
+  "name": "adb-iconfont",
+  "font_family": "iconfont",
+  "css_prefix_text": "adb",
+  "description": "",
+  "glyphs": [
+    {
+      "icon_id": "6271",
+      "name": "鞋",
+      "font_class": "xie",
+      "unicode": "e637",
+      "unicode_decimal": 58935
+    },
+    {
+      "icon_id": "782377",
+      "name": "客服",
+      "font_class": "kefu1",
+      "unicode": "e7de",
+      "unicode_decimal": 59358
+    },
+    {
+      "icon_id": "15933588",
+      "name": "定位",
+      "font_class": "dingwei",
+      "unicode": "e7fd",
+      "unicode_decimal": 59389
+    },
+    {
+      "icon_id": "22773533",
+      "name": "体系",
+      "font_class": "tixi",
+      "unicode": "e64d",
+      "unicode_decimal": 58957
+    },
+    {
+      "icon_id": "48093941",
+      "name": "体系",
+      "font_class": "testSkytixi",
+      "unicode": "ea40",
+      "unicode_decimal": 59968
+    }
+  ]
+}

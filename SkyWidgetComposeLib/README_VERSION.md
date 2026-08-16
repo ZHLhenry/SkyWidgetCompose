@@ -1,3 +1,11 @@
+## [v1.0.3] - 2026-08-16
+- 新增 SkyIconFont（图标字体）：纯 Compose 重写自原仓库 iconfont，不依赖 mikepenz/iconics，基于 Text + 原生 Typeface/FontFamily 渲染
+- 新增 SkyPercentImage（按比例图片）：纯 Compose 重写自 SkyPercentImageView，按宽/高为基准根据比例计算另一维度，支持任意 Painter 图片源
+- SkyIconFontsLib 支持多字体并存与混用，initRegister 注册字体（首个为默认字体），resolveTypeface 四级解析（文件名 → JSON name → css 前缀 → 默认）
+- SkyIconFontState 改为可观察状态（mutableStateOf），setIcon/setTint/setFontSize 驱动重组；修复显式 setter 与属性委托 JVM 签名冲突（@JvmName）
+- 修正 initRegister 重复初始化默认字体不更新问题；修复 fontName 文件名匹配链路
+- 同步更新 README_DOC.md（新增 SkyIconFont、SkyPercentImage 章节）
+
 ## [v1.0.2] - 2026-08-11
 - 新增 SkyRefreshPagingLayout：基于现有 SkyRefreshLayout 封装的 Paging 3 开箱即用列表容器
 - 新增 SkyRefreshState.bindPaging / rememberSkyRefreshPagingState 桥接 Paging 的 LoadState 与刷新动画

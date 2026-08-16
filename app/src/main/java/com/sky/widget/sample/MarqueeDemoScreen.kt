@@ -26,6 +26,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -41,29 +42,46 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import com.sky.mvi.core.compose.SkyMviScreen
 import com.sky.widget.marqueeView.SkyMarqueeDirection
 import com.sky.widget.marqueeView.SkyMarqueeState
 import com.sky.widget.marqueeView.SkyMarqueeView
 import com.sky.widget.marqueeView.rememberSkyMarqueeState
+import com.sky.widget.sample.marquee.MarqueeUiIntent
+import com.sky.widget.sample.marquee.MarqueeViewModel
 import com.sky.widget.sample.ui.theme.SkyWidgetComposeTheme
 
 /**
- * 跑马灯 / 轮播视图示例页。
+ * 跑马灯 / 轮播视图示例页（SkyMVI 改造版）。
  *
- * 演示：
- * - 简单文字轮播（自动播放、点击暂停/继续）
- * - 复杂卡片轮播（自定义 itemContent、点击事件）
- * - 方向切换、间隔调节、手动上一项 / 下一项 / 重置
+ * 播放状态、方向选择与轮播间隔由 [MarqueeViewModel] 持有并通过 [SkyMviScreen] 下发，
+ * SkyMarqueeState 自身负责播放控制，这里用 LaunchedEffect 将 UiState 同步到两个 state。
+ *
+ * 演示：文字轮播、复杂卡片轮播、方向切换、间隔调节、手动控制。
  */
 @Composable
 fun MarqueeDemoScreen(onBack: () -> Unit) {
+    SkyMviScreen(
+        viewModel = hiltViewModel<MarqueeViewModel>(),
+    ) { state, intent ->
+        MarqueeDemoContent(state = state, intent = intent, onBack = onBack)
+    }
+}
+
+@Composable
+private fun MarqueeDemoContent(
+    state: com.sky.widget.sample.marquee.MarqueeUiState,
+    intent: (MarqueeUiIntent) -> Unit,
+    onBack: () -> Unit,
+) {
     val context = LocalContext.current
     val scrollState = rememberScrollState()
 
     val textState: SkyMarqueeState = rememberSkyMarqueeState(initialFlipInterval = 2000L)
     val cardState: SkyMarqueeState = rememberSkyMarqueeState(initialFlipInterval = 2500L)
 
-    var direction by remember { mutableStateOf(SkyMarqueeDirection.LEFT) }
+    val direction = SkyMarqueeDirection.entries.getOrElse(state.directionIndex) { SkyMarqueeDirection.LEFT }
     var flipIntervalMs by remember { mutableIntStateOf(2000) }
 
     val textItems = remember {
@@ -83,9 +101,11 @@ fun MarqueeDemoScreen(onBack: () -> Unit) {
         )
     }
 
-    // 方向切换时同步两个 state 的间隔
-    textState.flipInterval = flipIntervalMs.toLong()
-    cardState.flipInterval = flipIntervalMs.toLong()
+    // 间隔变化时同步两个 state
+    LaunchedEffect(flipIntervalMs) {
+        textState.flipInterval = flipIntervalMs.toLong()
+        cardState.flipInterval = flipIntervalMs.toLong()
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         // 顶部标题栏
@@ -158,10 +178,10 @@ fun MarqueeDemoScreen(onBack: () -> Unit) {
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        SkyMarqueeDirection.entries.forEach { dir ->
-                            val selected = direction == dir
+                        SkyMarqueeDirection.entries.forEachIndexed { index, dir ->
+                            val selected = state.directionIndex == index
                             OutlinedButton(
-                                onClick = { direction = dir },
+                                onClick = { intent(MarqueeUiIntent.SetDirection(index)) },
                                 modifier = Modifier.weight(1f),
                                 contentPadding = PaddingValues(vertical = 6.dp)
                             ) {

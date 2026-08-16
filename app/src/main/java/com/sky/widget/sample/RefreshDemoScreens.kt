@@ -20,6 +20,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -27,6 +29,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -45,12 +48,15 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import com.sky.mvi.core.compose.SkyMviScreen
 import com.sky.widget.refresh.SkyRefreshFlag
 import com.sky.widget.refresh.SkyRefreshLayout
 import com.sky.widget.refresh.SkyRefreshState
@@ -59,9 +65,12 @@ import com.sky.widget.refresh.header.SkyBallRefreshHeader
 import com.sky.widget.refresh.header.SkyCircleRefreshHeader
 import com.sky.widget.refresh.header.SkyLottieRefreshHeader
 import com.sky.widget.refresh.header.SkyProgressRefreshHeader
+import com.sky.widget.grid.SkyGridLayout
 import com.sky.widget.refresh.header.SkyTimeRefreshHeader
 import com.sky.widget.refresh.header.SkyTwoLevelRefreshHeader
 import com.sky.widget.refresh.rememberSkyRefreshState
+import com.sky.widget.sample.refresh.RefreshUiIntent
+import com.sky.widget.sample.refresh.RefreshViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
@@ -88,6 +97,7 @@ private val refreshDemoEntries = listOf(
     RefreshDemoEntry("时间文案 Header", "SkyTimeRefreshHeader：箭头+状态文案+最后更新时间，文案/格式可同名资源覆盖", Screen.TimeHeader),
     RefreshDemoEntry("下拉进入二楼", "secondFloorRate + onSecondFloor：拉过二级阈值松手打开二楼", Screen.SecondFloor),
     RefreshDemoEntry("自定义二楼 Header", "不用库内组件：业务自定义 Header + 二楼进度渐变动画", Screen.CustomSecondFloor),
+    RefreshDemoEntry("网格内容", "SkyGridLayout 作为刷新容器的内容主体，支持下拉刷新与上拉加载", Screen.RefreshGrid),
 )
 
 /**
@@ -895,5 +905,110 @@ fun CustomSecondFloorDemoScreen(onBack: () -> Unit) {
 
             DemoSecondFloorOverlay(open = secondFloorOpen, onClose = { secondFloorOpen = false })
         }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// 示例 15：网格内容（SkyGridLayout 作为刷新容器的内容主体）
+// ─────────────────────────────────────────────────────────────────────
+
+@Composable
+fun GridRefreshDemoScreen(onBack: () -> Unit) {
+    SkyMviScreen(
+        viewModel = hiltViewModel<RefreshViewModel>(),
+    ) { state, intent ->
+        val refreshState = rememberSkyRefreshState()
+
+        LaunchedEffect(state.isRefreshing) {
+            if (!state.isRefreshing) refreshState.finish()
+        }
+        LaunchedEffect(state.isLoadingMore) {
+            if (!state.isLoadingMore) refreshState.finish(noMoreData = state.items.size >= 45)
+        }
+
+        RefreshDemoScaffold(title = "网格内容", onBack = onBack) {
+            SkyRefreshLayout(
+                modifier = Modifier.fillMaxSize(),
+                state = refreshState,
+                onRefresh = { intent(RefreshUiIntent.Refresh) },
+                onLoadMore = { intent(RefreshUiIntent.LoadMore) },
+                noMoreDataText = "没有更多商品啦"
+            ) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(vertical = 12.dp)
+                ) {
+                    item(key = "intro") {
+                        Text(
+                            text = "下面使用 SkyGridLayout 展示商品网格，支持下拉刷新与上拉加载。",
+                            fontSize = 13.sp,
+                            color = Color(0xFF666666),
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
+                    }
+                    item(key = "grid") {
+                        SkyGridLayout(
+                            items = state.items.indices.toList(),
+                            columns = 3,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp),
+                            horizontalSpacing = 8.dp,
+                            verticalSpacing = 8.dp
+                        ) { index ->
+                            GridProductCard(index = index + 1)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GridProductCard(index: Int) {
+    val colors = listOf(
+        Color(0xFFEF5350), Color(0xFFEC407A), Color(0xFFAB47BC),
+        Color(0xFF7E57C2), Color(0xFF5C6BC0), Color(0xFF42A5F5),
+        Color(0xFF29B6F6), Color(0xFF26C6DA), Color(0xFF26A69A),
+        Color(0xFF66BB6A), Color(0xFF9CCC65), Color(0xFFD4E157)
+    )
+    val color = colors.getOrElse((index - 1) % colors.size) { Color(0xFF2196F3) }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color.White)
+            .padding(8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .clip(RoundedCornerShape(6.dp))
+                .background(color.copy(alpha = 0.15f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "$index",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = color
+            )
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = "商品 $index",
+            fontSize = 13.sp,
+            color = Color(0xFF333333),
+            maxLines = 1
+        )
+        Text(
+            text = "¥${index * 10}",
+            fontSize = 12.sp,
+            color = color,
+            fontWeight = FontWeight.Medium
+        )
     }
 }
