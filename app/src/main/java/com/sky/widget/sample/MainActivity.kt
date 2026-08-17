@@ -5,7 +5,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import dagger.hilt.android.AndroidEntryPoint
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -37,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sky.widget.grid.SkyGridLayout
 import com.sky.widget.sample.ui.theme.SkyWidgetComposeTheme
+import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -67,7 +67,8 @@ fun AppRoot() {
     BackHandler(enabled = currentPage != Screen.Home) {
         currentPage = when (currentPage) {
             Screen.Refresh, Screen.StateLayout, Screen.Signature, Screen.AnnotatedText,
-            Screen.Grid, Screen.Marquee, Screen.Badge, Screen.IconFont, Screen.Image -> Screen.Home
+            Screen.Grid, Screen.Marquee, Screen.Badge, Screen.IconFont, Screen.Image,
+            Screen.QRCode -> Screen.Home
             else -> Screen.Refresh
         }
     }
@@ -102,6 +103,7 @@ fun AppRoot() {
         Screen.Badge -> BadgeDemoScreen(onBack = { currentPage = Screen.Home })
         Screen.IconFont -> IconFontDemoScreen(onBack = { currentPage = Screen.Home })
         Screen.Image -> ImageDemoScreen(onBack = { currentPage = Screen.Home })
+        Screen.QRCode -> QRCodeDemoScreen(onBack = { currentPage = Screen.Home })
     }
 }
 
@@ -132,6 +134,7 @@ sealed interface Screen {
     data object Badge : Screen
     data object IconFont : Screen
     data object Image : Screen
+    data object QRCode : Screen
 }
 
 /**
@@ -167,6 +170,7 @@ fun HomeScreen(onNavigate: (Screen) -> Unit) {
             ComponentItem("徽章", "\uD83D\uDD34"),          // 🔴 红点徽标
             ComponentItem("图标字体", "\uD83D\uDD24"),      // 🔤 图标/字母
             ComponentItem("按比例图片", "\uD83D\uDDBC️"),   // 🖼️ 图片比例
+            ComponentItem("二维码", "▦"),            // ▦ 黑白矩阵，贴合二维码语义
         )
 
         SkyGridLayout(
@@ -190,6 +194,7 @@ fun HomeScreen(onNavigate: (Screen) -> Unit) {
                         "徽章" -> onNavigate(Screen.Badge)
                         "图标字体" -> onNavigate(Screen.IconFont)
                         "按比例图片" -> onNavigate(Screen.Image)
+                        "二维码" -> onNavigate(Screen.QRCode)
                     }
                 }
             )

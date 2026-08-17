@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -175,7 +176,7 @@ fun <T : Any> SkyRefreshPagingLayout(
         footer = footer
     ) {
         LazyColumn {
-            // parComposable: 列表主体，key/type 优先用调用方提供的稳定映射
+            // 列表主体：key/contentType 优先使用调用方提供的稳定映射，未提供时用数据项自身
             items(
                 count = lazyPagingItems.itemCount,
                 key = if (itemKey != null) {
@@ -192,7 +193,7 @@ fun <T : Any> SkyRefreshPagingLayout(
                 val item = lazyPagingItems[index] ?: return@items
                 content(item)
             }
-            // parComposable: append 加载中/出错时的底部提示行
+            // append 加载中/出错时的底部提示行
             pagingAppendFooter(lazyPagingItems, noMoreDataText)
         }
     }
@@ -205,7 +206,7 @@ fun <T : Any> SkyRefreshPagingLayout(
  * - 出错：显示错误文案（点击重试重新触发 Paging 下一页）
  * - 已到末页：根据 [noMoreDataText] 是否非空决定是否显示「没有更多数据」
  */
-private fun androidx.compose.foundation.lazy.LazyListScope.pagingAppendFooter(
+private fun LazyListScope.pagingAppendFooter(
     lazyPagingItems: LazyPagingItems<*>,
     noMoreDataText: String?
 ) {

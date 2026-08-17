@@ -2,6 +2,7 @@ package com.sky.widget.refresh.header
 
 import android.content.Context
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.core.content.edit
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,7 +38,6 @@ import com.sky.widget.refresh.SkyRefreshState
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import androidx.core.content.edit
 
 private const val PREFS_NAME = "SkyTimeRefreshHeader"
 private const val KEY_LAST_UPDATE_TIME = "lastUpdateTime"

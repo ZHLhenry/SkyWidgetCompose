@@ -1,7 +1,6 @@
 package com.sky.widget.marqueeView
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideInVertically
@@ -135,7 +134,6 @@ fun rememberSkyMarqueeState(
  * @param onItemClick 点击回调，参数为当前索引与对应数据。
  * @param itemContent 每一项的 Composable 内容。
  */
-@OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun <T> SkyMarqueeView(
     items: List<T>,

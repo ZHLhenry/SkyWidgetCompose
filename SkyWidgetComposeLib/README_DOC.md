@@ -17,6 +17,7 @@ SkyWidgetCompose 是一组基于 Jetpack Compose 的通用 UI 组件库，覆盖
 - [SkyMarqueeView（跑马灯 / 轮播）](#skymarqueeview跑马灯--轮播)
 - [SkyIconFont（图标字体）](#skyiconfont图标字体)
 - [SkyPercentImage（按比例图片）](#skypercentimage按比例图片)
+- [SkyQRCode（二维码扫描与生成）](#skyqrcode二维码扫描与生成)
 
 ---
 
@@ -28,7 +29,7 @@ SkyWidgetCompose 是一组基于 Jetpack Compose 的通用 UI 组件库，覆盖
 
 ```kotlin
 dependencies {
-    implementation("com.sky.lib:SkyWidgetCompose:1.0.0")
+    implementation("com.sky.lib:SkyWidgetCompose:1.0.4")
 }
 ```
 
@@ -723,6 +724,132 @@ SkyPercentImage(
 
 ---
 
+## SkyQRCode（二维码扫描与生成）
+
+基于 **CameraX + ZXing** 的二维码 / 条形码模块，提供声明式扫码组件 [SkyQRCodeScanner]、
+生成组件 [SkyQRCodeImage] / [SkyBarcodeImage]，以及 `SkyQRCode` 工具对象（生成、解析本地图片）。
+
+### 依赖与权限
+
+CameraX 与 ZXing 在库内以 `implementation` 引入，**不会传递给消费者**，无需额外导包。
+
+扫码需要相机权限、震动需要 VIBRATE 权限，均由消费者在 `AndroidManifest.xml` 中声明并在运行时申请：
+
+```xml
+<uses-permission android:name="android.permission.CAMERA" />
+<uses-permission android:name="android.permission.VIBRATE" />
+```
+
+> ⚠️ 未授予相机权限时，`SkyQRCodeScanner` 会抛出 `SecurityException` 并附带 Manifest 声明提示。
+
+### SkyQRCodeScanner（扫码）
+
+```kotlin
+@Composable
+fun SkyQRCodeScanner(
+    modifier: Modifier = Modifier,
+    state: SkyQRCodeState = rememberSkyQRCodeState(),
+    onResult: (SkyQRCodeResult) -> Unit,
+    onError: (Exception) -> Unit = {},
+    viewfinder: @Composable BoxScope.(SkyQRCodeState) -> Unit = { SkyQRCodeViewfinder(state = it, ...) },
+    overlay: @Composable BoxScope.(SkyQRCodeState) -> Unit = {}
+)
+```
+
+| 参数 | 说明 |
+|------|------|
+| `state` | 扫码器状态：扫描模式、取景框尺寸/位置、闪光灯、提示音、震动、暂停/继续 |
+| `onResult` | 识别结果回调（**主线程**派发，可安全执行 UI 操作） |
+| `onError` | 相机初始化或绑定失败回调 |
+| `viewfinder` | 取景框渲染插槽，默认 [SkyQRCodeViewfinder]（四角边框 + 扫描线动画） |
+| `overlay` | 覆盖层插槽，可放置标题、返回按钮、闪光灯开关等自定义 UI |
+
+#### 基础用法
+
+```kotlin
+val state = rememberSkyQRCodeState(mode = SkyQRCodeMode.All)
+
+SkyQRCodeScanner(
+    state = state,
+    modifier = Modifier.fillMaxSize(),
+    onResult = { result ->
+        when (result) {
+            is SkyQRCodeResult.Success -> { /* result.text / result.format */ }
+            is SkyQRCodeResult.Failure -> { /* 解析失败（本地图片解析场景） */ }
+        }
+    },
+    onError = { e -> /* 相机异常处理 */ },
+    overlay = { s ->
+        IconButton(onClick = { s.setFlashEnabled(!s.flashEnabled) }, modifier = Modifier.align(Alignment.BottomCenter)) {
+            Icon(if (s.flashEnabled) Icons.Outlined.FlashOn else Icons.Outlined.FlashOff, contentDescription = null)
+        }
+    }
+)
+```
+
+#### 扫描模式（SkyQRCodeMode）
+
+| 模式 | 识别范围 |
+|------|---------|
+| `All`（默认） | 所有支持的格式 |
+| `OneD` | 一维条码（UPC、EAN、Code 39、Code 128、ITF 等） |
+| `Product` | UPC / EAN 商品条码 |
+| `QRCode` | 仅二维码 |
+| `DataMatrix` | 仅 Data Matrix 码 |
+
+#### 状态能力（SkyQRCodeState）
+
+| 方法 | 说明 |
+|------|------|
+| `setMode(mode)` | 切换扫描模式（重新绑定分析器生效） |
+| `setFrameSize(DpSize)` / `setFrameMarginTop(Dp)` | 取景框尺寸 / 顶部边距；`Dp.Unspecified` 分别表示容器宽度的一半 / 垂直居中 |
+| `setFlashEnabled(enabled)` | 闪光灯开关；息屏回前台后自动重新应用 |
+| `setBeepEnabled(enabled)` / `setBeepResId(resId)` | 提示音开关与自定义 raw 资源；`resId = 0` 使用库内置默认提示音 |
+| `setVibrateEnabled(enabled)` | 震动开关 |
+| `pause()` / `resume()` | 暂停 / 继续扫描（识别成功后建议先 `pause()` 处理业务） |
+
+#### 识别行为约定
+
+- **所见即所扫**：识别区域与视觉取景框严格一致（按 PreviewView FILL_CENTER 规则反映射到相机帧）。
+- **结果去重**：连续相同结果不重复上报；切换为不同内容的码立即上报；码离开视野（连续空帧）后去重状态自动重置。
+- 解码在后台线程执行（CPU 密集），回调切回主线程。
+
+### SkyQRCodeImage / SkyBarcodeImage（生成）
+
+```kotlin
+// 二维码：支持中心 Logo（大小、圆角可配）
+SkyQRCodeImage(
+    content = "https://example.com",
+    size = 200.dp,
+    logo = logoBitmap,        // 可空
+    logoSize = 40.dp,         // 0.dp = 默认取码短边的 1/5
+    logoCornerRadius = 8.dp   // 0.dp = 不裁剪圆角
+)
+
+// 条形码：黑条白底，支持常用一维条码格式
+SkyBarcodeImage(
+    content = "6901234567892",
+    format = SkyBarcodeFormat.EAN_13,
+    width = 200.dp,
+    height = 100.dp
+)
+```
+
+> Logo 大小上限为二维码短边的 **1/3**，超过时打印警告并回退默认大小（1/5），不会抛出异常。
+> `SkyBarcodeFormat` 支持：CODE_39 / CODE_93 / CODE_128 / EAN_8 / EAN_13 / ITF / CODABAR / UPC_A / UPC_E；
+> 内容不符合格式要求（如 EAN_13 位数错误）时组件不渲染、工具方法返回 null。
+
+### SkyQRCode 工具对象
+
+| 方法 | 说明 |
+|------|------|
+| `analyzeBitmap(path)` / `analyzeBitmap(bitmap)` | 解析本地图片中的二维码/条形码，返回 `SkyQRCodeResult` |
+| `createQRCode(content, size)` | 生成正方形二维码 Bitmap |
+| `createQRCode(content, width, height, logo?, logoSize, logoCornerRadius)` | 生成带 Logo 二维码，失败返回 null |
+| `createBarcode(content, format, width, height)` | 生成条形码 Bitmap，失败返回 null |
+
+---
+
 ## 附录：库资源前缀
 
 库内字符串 / 颜色资源统一使用前缀 `sky_rl_*`，R 文件路径为 `com.sky.widget.R`。
@@ -732,7 +859,7 @@ SkyPercentImage(
 ## 附录：发布坐标
 
 ```groovy
-implementation "com.sky.lib:SkyWidgetCompose:1.0.0"
+implementation "com.sky.lib:SkyWidgetCompose:1.0.4"
 ```
 
 发布仓库与凭证来自 `local.properties` 中的 `mavenCentral.*` 配置；发布账号与仓库读取账号不同，请勿混用。

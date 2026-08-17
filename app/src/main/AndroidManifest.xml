@@ -2,6 +2,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- 二维码扫描示例需要相机权限，由消费者（app 模块）声明并申请 -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <!-- 识别成功后的震动反馈需要振动权限（Android 13+ 使用 VibratorManager 需要） -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
+
     <application
         android:name=".SampleApp"
         android:allowBackup="true"

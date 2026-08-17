@@ -5,11 +5,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.graphics.painter.Painter
-import androidx.compose.ui.layout.ContentScale
 
 /**
  * 基准维度：决定以宽或高哪一边作为计算另一边的依据。
@@ -54,7 +54,7 @@ enum class SkyPercentBasics {
  * @param basics 基准边，默认 [SkyPercentBasics.Width]
  * @param percent 比例值（另一条边 = 基准边 × percent），范围通常 0f~1f，默认 1f
  * @param alignment 图片在占位框内的对齐方式
- * @param contentScale 图片在框内的缩放方式，默认 [Alignment.Center]
+ * @param contentScale 图片在框内的缩放方式，默认 [ContentScale.Fit]
  */
 @Composable
 fun SkyPercentImage(

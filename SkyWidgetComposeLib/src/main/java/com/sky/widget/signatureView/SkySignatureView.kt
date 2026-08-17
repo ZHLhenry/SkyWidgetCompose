@@ -1,9 +1,11 @@
 package com.sky.widget.signatureView
 
 import android.graphics.Bitmap
+import android.graphics.BlendMode
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
+import android.os.Build
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -125,7 +127,7 @@ fun SkySignatureView(
     ) {
         drawIntoCanvas { canvas ->
             val nativeCanvas = canvas.nativeCanvas
-            nativeCanvas.drawColor(backgroundColor.toArgb())
+            nativeCanvas.fillWith(backgroundColor.toArgb())
 
             val path = state.buildPath()
             if (!path.isEmpty) {
@@ -196,7 +198,7 @@ class SkySignatureViewState internal constructor() {
         val height = size.height.toInt().coerceAtLeast(1)
         val bitmap = createBitmap(width, height)
         val canvas = Canvas(bitmap)
-        canvas.drawColor(backgroundColor.toArgb())
+        canvas.fillWith(backgroundColor.toArgb())
         val path = buildPath()
         if (!path.isEmpty) {
             canvas.drawPath(path, paint)
@@ -214,5 +216,20 @@ class SkySignatureViewState internal constructor() {
             }
         }
         return path
+    }
+}
+
+/**
+ * 用指定颜色填充整块画布。
+ *
+ * [Canvas.drawColor] 的单参重载自 API 29 起过时，新系统改用 [BlendMode] 版本，
+ * 低版本回退旧实现，避免直接调用过时方法。
+ */
+private fun Canvas.fillWith(color: Int) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        drawColor(color, BlendMode.SRC_OVER)
+    } else {
+        @Suppress("DEPRECATION")
+        drawColor(color)
     }
 }
