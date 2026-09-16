@@ -5,6 +5,7 @@ import androidx.camera.core.ImageProxy
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.BinaryBitmap
 import com.google.zxing.DecodeHintType
+import com.google.zxing.InvertedLuminanceSource
 import com.google.zxing.MultiFormatReader
 import com.google.zxing.ReaderException
 import com.google.zxing.Result
@@ -30,7 +31,18 @@ internal class SkyQRCodeAnalyzer(
     private val onEmpty: () -> Unit = {}
 ) : ImageAnalysis.Analyzer {
 
-    private val reader = MultiFormatReader().apply {
+    // 2D / 1D 分组解码：2D 矩阵码误报率极低，优先解码可拦截真实二维码；
+    // 1D 格式（尤其 UPC_E/EAN_8 等短码）校验位弱，二维码的密集纹理容易被误判为 1D 条码
+    private val twoDReader: MultiFormatReader?
+    private val oneDReader: MultiFormatReader?
+
+    init {
+        val (twoD, oneD) = DecodeFormatResolver.splitByDimension(formats)
+        twoDReader = twoD.takeIf { it.isNotEmpty() }?.let { buildReader(it) }
+        oneDReader = oneD.takeIf { it.isNotEmpty() }?.let { buildReader(it) }
+    }
+
+    private fun buildReader(formats: List<BarcodeFormat>) = MultiFormatReader().apply {
         setHints(
             mapOf(
                 DecodeHintType.POSSIBLE_FORMATS to formats,
@@ -40,6 +52,10 @@ internal class SkyQRCodeAnalyzer(
             )
         )
     }
+
+    // 1D 误报防护：要求同一 1D 结果连续命中 2 帧才上报，过滤单帧随机误报；2D 结果立即上报
+    private var pendingOneDText: String? = null
+    private var pendingOneDHits = 0
 
     @Volatile
     private var isAnalyzing = false
@@ -90,27 +106,79 @@ internal class SkyQRCodeAnalyzer(
                 PlanarYUVLuminanceSource(rotatedData, width, height, 0, 0, width, height)
             }
 
-            // HybridBinarizer 适合二维码；条形码（1D）更适合 GlobalHistogramBinarizer，
-            // 因此首选 Hybrid，失败后重试一次 GlobalHistogram，兼顾两类码的识别率
-            val result: Result? = try {
-                reader.decodeWithState(BinaryBitmap(HybridBinarizer(source)))
-            } catch (e: ReaderException) {
-                try {
-                    reader.decodeWithState(BinaryBitmap(GlobalHistogramBinarizer(source)))
-                } catch (e2: ReaderException) {
-                    null
+            // 先解 2D 矩阵码：命中则立即上报，避免真实二维码落入 1D 误报
+            val twoDResult = twoDReader?.let { decodeWithRetry(it, source) }
+            if (twoDResult != null) {
+                pendingOneDText = null
+                pendingOneDHits = 0
+                onResult(twoDResult)
+            } else if (oneDReader != null) {
+                val oneDResult = decodeWithRetry(oneDReader, source)
+                if (oneDResult == null) {
+                    // 空帧中断连续性，清除待确认的 1D 候选
+                    pendingOneDText = null
+                    pendingOneDHits = 0
+                    onEmpty()
+                } else if (confirmOneD(oneDResult.text)) {
+                    onResult(oneDResult)
+                } else {
+                    // 未达连续确认帧数，继续下一帧
+                    onEmpty()
                 }
-            }
-            if (result != null) {
-                onResult(result)
             } else {
-                // 未识别到条码，继续下一帧
                 onEmpty()
             }
-            reader.reset()
+            twoDReader?.reset()
+            oneDReader?.reset()
         } finally {
             image.close()
             isAnalyzing = false
+        }
+    }
+
+    /**
+     * HybridBinarizer 适合二维码；条形码（1D）更适合 GlobalHistogramBinarizer，
+     * 因此首选 Hybrid，失败后重试一次 GlobalHistogram，兼顾两类码的识别率；
+     * 仍失败则以亮度取反重试：ZXing 仅支持深色模块+浅色底的标准码，
+     * 反色码（浅色模块印在深色背景上，常见于深色产品包装）必须取反后才能解码。
+     */
+    private fun decodeWithRetry(reader: MultiFormatReader, source: PlanarYUVLuminanceSource): Result? {
+        val invertedSource = lazy { InvertedLuminanceSource(source) }
+        return try {
+            reader.decodeWithState(BinaryBitmap(HybridBinarizer(source)))
+        } catch (e: ReaderException) {
+            try {
+                reader.decodeWithState(BinaryBitmap(GlobalHistogramBinarizer(source)))
+            } catch (e2: ReaderException) {
+                try {
+                    reader.decodeWithState(BinaryBitmap(HybridBinarizer(invertedSource.value)))
+                } catch (e3: ReaderException) {
+                    try {
+                        reader.decodeWithState(BinaryBitmap(GlobalHistogramBinarizer(invertedSource.value)))
+                    } catch (e4: ReaderException) {
+                        null
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * 1D 结果连续帧确认：同一文本连续命中 [ONE_D_CONFIRM_FRAMES] 帧才返回 true。
+     */
+    private fun confirmOneD(text: String): Boolean {
+        if (text == pendingOneDText) {
+            pendingOneDHits++
+        } else {
+            pendingOneDText = text
+            pendingOneDHits = 1
+        }
+        return if (pendingOneDHits >= ONE_D_CONFIRM_FRAMES) {
+            pendingOneDText = null
+            pendingOneDHits = 0
+            true
+        } else {
+            false
         }
     }
 
@@ -158,3 +226,6 @@ internal class SkyQRCodeAnalyzer(
         }
     }
 }
+
+/** 1D 结果上报所需的连续命中帧数。 */
+private const val ONE_D_CONFIRM_FRAMES = 2

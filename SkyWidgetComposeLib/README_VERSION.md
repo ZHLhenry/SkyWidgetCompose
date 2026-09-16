@@ -1,3 +1,12 @@
+## [v1.0.5] - 2026-09-16
+- 新增 SkyBottomSheet（底部弹窗）：基于 Material3 ModalBottomSheet 实现；SkyBottomSheetState 提供 show/hide/animateTo/isVisible；支持 initialValue 初始锚点（Hidden/HalfExpanded/Expanded）；容器背景色 sheetBackgroundColor、顶部圆角 sheetCornerRadius、modifier 可自定义
+- 新增 SkyNumberKeyBoard（数字键盘）：经 SkyBottomSheet 弹出或内嵌页面（asBottomSheet）；随机乱序键盘（0-9 全部参与乱序）、showDot 控制小数点键、deleteIcon 支持 SkyKeyBoardIcon.Vector/IconFont 双形式、确认键自定义（confirmText/confirmModifier/confirmDisable）、按键尺寸与间距可调
+- 新增 SkyRatingBar（评分条）：点击/滑动打分、allowHalf 半星（宽度百分比裁剪）、readOnly 只读；图标支持 SkyRatingIcon.Vector/Iconfont 双形式，默认内置五角星
+- 新增 SkyVerifyCodeEdit（验证码输入框）：Canvas 绘制格子（BottomLine 下划线 / Square 正方形）；经 PlatformTextInputModifierNode 与 IME 会话；仅接受数字、删除回退一位、光标闪烁、输满 onComplete 回调
+- SkyQRCode 增强：取景框与条码识别增强，修复反色二维码无法识别问题
+- 示例应用：包名迁移 com.sky.widget.samplecp；新增数字键盘、底部弹窗、评分条、验证码示例页与首页入口
+- 同步更新 README_DOC.md（新增 SkyBottomSheet、SkyNumberKeyBoard、SkyRatingBar、SkyVerifyCodeEdit 章节与目录项）
+
 ## [v1.0.4] - 2026-08-17
 - 新增 SkyQRCode（二维码/条形码）模块：基于 CameraX + ZXing 的扫码与生成能力
   - SkyQRCodeScanner 声明式扫码组件：扫描模式（All/OneD/Product/QRCode/DataMatrix）、取景框尺寸与位置、闪光灯、成功提示音（支持自定义 raw 资源，未设置回退库内置默认音）与震动、pause/resume；连续相同结果去重，不同码即时上报

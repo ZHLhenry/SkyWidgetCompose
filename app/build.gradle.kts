@@ -15,20 +15,20 @@ val localProps = Properties().apply {
 val useLocalSkyWidgetCompose = localProps.getProperty("useLocalSkyWidgetCompose")?.toBooleanStrictOrNull() ?: false
 
 android {
-    namespace = "com.sky.widget.sample"
+    namespace = "com.sky.widget.samplecp"
     flavorDimensions += "contentType"
     productFlavors {
         create("dev") {
             dimension = "contentType"
-            manifestPlaceholders["app_icon"] = "@mipmap/ic_launcher"
+            manifestPlaceholders["app_icon"] = "@mipmap/ic_skywidgetcompose_debug"
         }
         create("uat") {
             dimension = "contentType"
-            manifestPlaceholders["app_icon"] = "@mipmap/ic_launcher"
+            manifestPlaceholders["app_icon"] = "@mipmap/ic_skywidgetcompose"
         }
         create("prod") {
             dimension = "contentType"
-            manifestPlaceholders["app_icon"] = "@mipmap/ic_launcher"
+            manifestPlaceholders["app_icon"] = "@mipmap/ic_skywidgetcompose"
         }
     }
 }
@@ -41,6 +41,9 @@ dependencies {
     implementation(libs.xlog)
     // 库的 SkyLottieRefreshHeader 为 compileOnly 依赖 Lottie，使用方需自行导包
     implementation(libs.lottie.compose)
+    testImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
     if (useLocalSkyWidgetCompose) {
         implementation(project(":SkyWidgetComposeLib"))
     } else {

@@ -18,6 +18,10 @@ SkyWidgetCompose 是一组基于 Jetpack Compose 的通用 UI 组件库，覆盖
 - [SkyIconFont（图标字体）](#skyiconfont图标字体)
 - [SkyPercentImage（按比例图片）](#skypercentimage按比例图片)
 - [SkyQRCode（二维码扫描与生成）](#skyqrcode二维码扫描与生成)
+- [SkyBottomSheet（底部弹窗）](#skybottomsheet底部弹窗)
+- [SkyNumberKeyBoard（数字键盘）](#skynumberkeyboard数字键盘)
+- [SkyRatingBar（评分条）](#skyratingbar评分条)
+- [SkyVerifyCodeEdit（验证码输入框）](#skyverifycodeedit验证码输入框)
 
 ---
 
@@ -29,7 +33,7 @@ SkyWidgetCompose 是一组基于 Jetpack Compose 的通用 UI 组件库，覆盖
 
 ```kotlin
 dependencies {
-    implementation("com.sky.lib:SkyWidgetCompose:1.0.4")
+    implementation("com.sky.lib:SkyWidgetCompose:1.0.5")
 }
 ```
 
@@ -850,6 +854,228 @@ SkyBarcodeImage(
 
 ---
 
+## SkyBottomSheet（底部弹窗）
+
+基于 Material3 `ModalBottomSheet` 的底部弹窗：模态（带遮罩、拦截返回键）、支持下滑手势关闭；
+隐藏后组件移出组合。内容被弹窗圆角形状裁剪。
+
+### API
+
+```kotlin
+@Composable
+fun SkyBottomSheet(
+    modifier: Modifier = Modifier,
+    state: SkyBottomSheetState = rememberBottomSheetState(),
+    sheetBackgroundColor: Color = Color.Transparent,
+    sheetCornerRadius: Dp = 28.dp,
+    content: @Composable () -> Unit
+)
+
+@Composable
+fun rememberBottomSheetState(
+    initialValue: SkyBottomSheetValue = SkyBottomSheetValue.Hidden
+): SkyBottomSheetState
+
+open class SkyBottomSheetState {
+    val initialValue: SkyBottomSheetValue
+    val isVisible: Boolean
+    suspend fun show()
+    suspend fun animateTo(targetValue: SkyBottomSheetValue)
+    suspend fun hide()
+}
+
+enum class SkyBottomSheetValue { Hidden, Expanded, HalfExpanded }
+```
+
+### 关键概念
+
+| 名称 | 说明 |
+|------|------|
+| `show()` | 展示弹窗并展开到初始锚点 |
+| `animateTo(HalfExpanded / Expanded)` | 动画切换锚点；半屏锚点需内容高度超过半屏才生效 |
+| `hide()` | 动画隐藏并移出组合 |
+| `initialValue` | 初始锚点；非 `Hidden` 时 state 创建即展示 |
+| `sheetCornerRadius` | 顶部圆角半径，传 `0.dp` 为直角 |
+| `sheetBackgroundColor` | 默认透明，由内容自行绘制背景 |
+
+### 基础用法
+
+```kotlin
+val state = rememberBottomSheetState()
+val scope = rememberCoroutineScope()
+
+Button(onClick = { scope.launch { state.show() } }) { Text("展示") }
+
+SkyBottomSheet(state = state, sheetBackgroundColor = Color.White) {
+    Column(Modifier.fillMaxWidth().padding(16.dp)) {
+        Text("弹窗内容")
+        Button(onClick = { scope.launch { state.hide() } }) { Text("隐藏") }
+    }
+}
+```
+
+---
+
+## SkyNumberKeyBoard（数字键盘）
+
+数字键盘组件：默认经 [SkyBottomSheet] 弹出，也可内嵌页面（`asBottomSheet = false`）；
+4 列等宽布局（左侧 3 列数字区 + 右侧删除/确认列）。
+
+### API
+
+```kotlin
+@Composable
+fun SkyNumberKeyBoard(
+    modifier: Modifier = Modifier,
+    confirmModifier: Modifier = Modifier,
+    state: SkyBottomSheetState = rememberBottomSheetState(),
+    sheetCornerRadius: Dp = 28.dp,
+    horizontalSpacing: Dp = 6.dp,
+    verticalSpacing: Dp = 6.dp,
+    itemHeight: Dp = 48.dp,
+    confirmText: String = "确定",
+    confirmDisable: Boolean = false,
+    random: Boolean = false,
+    showDot: Boolean = true,
+    deleteIcon: SkyKeyBoardIcon? = null,
+    asBottomSheet: Boolean = true,
+    onInput: ((value: String) -> Unit)? = null,
+    onDelete: (() -> Unit)? = null,
+    onConfirm: (() -> Unit)? = null,
+)
+
+sealed interface SkyKeyBoardIcon {
+    data class Vector(val imageVector: ImageVector) : SkyKeyBoardIcon
+    data class IconFont(val iconName: String, val fontName: String? = null) : SkyKeyBoardIcon
+}
+```
+
+### 关键概念
+
+| 名称 | 说明 |
+|------|------|
+| `random` | 0-9 全部参与乱序，末位乱序数字落底行（安全键盘场景） |
+| `showDot` | 隐藏后底行数字键占满整行 |
+| `deleteIcon` | 删除键图标；null 用内置 Backspace 矢量图标；`IconFont` 需先经 `SkyIconFontsLib.initRegister` 注册字体 |
+| `confirmModifier` | 确认键修饰符（自定义背景/边框等），作用于按键修饰符链最内层 |
+| `asBottomSheet` | 为 false 时内嵌页面，`state` / `sheetCornerRadius` 不生效 |
+
+### 基础用法
+
+```kotlin
+val state = rememberBottomSheetState()
+var input by remember { mutableStateOf("") }
+
+SkyNumberKeyBoard(
+    state = state,
+    onInput = { input += it },
+    onDelete = { input = input.dropLast(1) },
+    onConfirm = { scope.launch { state.hide() } }
+)
+```
+
+---
+
+## SkyRatingBar（评分条）
+
+评分条组件：支持点击 / 滑动打分、整星与半星、只读展示；布局为「底层 normal 图标行 +
+上层 active 图标行」叠加，半星按宽度百分比裁剪 active 图标，对任意图标类型均生效。
+
+### API
+
+```kotlin
+@Composable
+fun SkyRatingBar(
+    count: Int = 5,
+    size: DpSize = DpSize(20.dp, 20.dp),
+    horizontalSpacing: Dp = 4.dp,
+    value: Float = Float.NaN,
+    activeColor: Color = Color(0xFFF7BA2A),
+    normalColor: Color = Color(0xFFC6D1DE),
+    activeIcon: SkyRatingIcon = SkyRatingIcon.Vector(DefaultStarIcon),
+    normalIcon: SkyRatingIcon = SkyRatingIcon.Vector(DefaultStarIcon),
+    allowHalf: Boolean = false,
+    readOnly: Boolean = false,
+    onChange: (value: Float) -> Unit
+)
+
+sealed interface SkyRatingIcon {
+    data class Vector(val imageVector: ImageVector) : SkyRatingIcon
+    data class Iconfont(val iconName: String, val fontName: String? = null) : SkyRatingIcon
+}
+```
+
+### 关键概念
+
+| 名称 | 说明 |
+|------|------|
+| `value` | 传 `Float.NaN` 时不绘制选中层（仅展示 normal 图标） |
+| `allowHalf` | 0.5 步进，小数部分按百分比裁剪渲染半星 |
+| `readOnly` | 禁用点击与滑动手势（只读展示） |
+| `SkyRatingIcon.Iconfont` | iconfont 图标，需先经 `SkyIconFontsLib.initRegister` 注册字体 |
+
+### 基础用法
+
+```kotlin
+var rating by remember { mutableStateOf(3.5f) }
+
+// 默认内置五角星，开箱即用
+SkyRatingBar(value = rating, allowHalf = true, onChange = { rating = it })
+```
+
+---
+
+## SkyVerifyCodeEdit（验证码输入框）
+
+验证码输入框组件：基于 Canvas 绘制格子、数字与光标；通过 `PlatformTextInputModifierNode`
+与输入法建立会话；仅接受数字提交（超长截断），删除键回退一位，光标在下一个待输入位闪烁，
+输满自动回调；键盘弹出且持有焦点时自动滚动到可见区域。
+
+### API
+
+```kotlin
+@Composable
+fun SkyVerifyCodeEdit(
+    modifier: Modifier = Modifier,
+    count: Int = 6,
+    space: Dp = 10.dp,
+    size: DpSize = DpSize(40.dp, 40.dp),
+    lineHeight: Dp = 2.dp,
+    textFontSize: TextUnit = 32.sp,
+    activeLineColor: Color = MaterialTheme.colorScheme.onSurface,
+    textColor: Color = activeLineColor,
+    normalLineColor: Color = activeLineColor.copy(alpha = 0.38f),
+    cursorLineWidth: Dp = 2.dp,
+    cursorLineHeight: Dp = Dp.Unspecified,
+    cursorLineHeightRatio: Float = 0.4f,
+    cursorLineColor: Color = Color.Black,
+    type: SkyVerifyType = SkyVerifyType.BottomLine,
+    keyboardType: KeyboardType = KeyboardType.Number,
+    onComplete: (text: String) -> Unit,
+)
+
+enum class SkyVerifyType { BottomLine, Square }
+```
+
+### 关键概念
+
+| 名称 | 说明 |
+|------|------|
+| `type` | 格子样式：`BottomLine` 下划线 / `Square` 正方形边框 |
+| `onComplete` | 输满 `count` 位时回调完整验证码 |
+| `keyboardType` | 默认 `Number`；**勿传 `NumberPassword`**：华为等机型会触发系统安全键盘，其不遵循标准 InputConnection 协议，导致删除键失效 |
+| 光标高度 | `cursorLineHeight` 未指定时按格子高度 × `cursorLineHeightRatio` 计算 |
+
+### 基础用法
+
+```kotlin
+SkyVerifyCodeEdit(count = 4, type = SkyVerifyType.Square) { code ->
+    // 提交验证码
+}
+```
+
+---
+
 ## 附录：库资源前缀
 
 库内字符串 / 颜色资源统一使用前缀 `sky_rl_*`，R 文件路径为 `com.sky.widget.R`。
@@ -859,7 +1085,7 @@ SkyBarcodeImage(
 ## 附录：发布坐标
 
 ```groovy
-implementation "com.sky.lib:SkyWidgetCompose:1.0.4"
+implementation "com.sky.lib:SkyWidgetCompose:1.0.5"
 ```
 
 发布仓库与凭证来自 `local.properties` 中的 `mavenCentral.*` 配置；发布账号与仓库读取账号不同，请勿混用。

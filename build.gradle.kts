@@ -1,8 +1,8 @@
 // skyBuild 配置
 extra["skyBuild.appName"] = "SkyWidgetCompose"
-extra["skyBuild.applicationId"] = "com.sky.widget.sample"
-extra["skyBuild.versionCode"] = 100
-extra["skyBuild.versionName"] = "1.0.0"
+extra["skyBuild.applicationId"] = "com.sky.widget.samplecp"
+extra["skyBuild.versionCode"] = 105
+extra["skyBuild.versionName"] = "1.0.5"
 extra["skyBuild.compileSdk"] = 37
 extra["skyBuild.minSdk"] = 24
 extra["skyBuild.targetSdk"] = 35
