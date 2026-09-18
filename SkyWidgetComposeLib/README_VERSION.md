@@ -1,3 +1,7 @@
+## [v1.0.7] - 2026-09-18
+- 构建工具链升级：skyBuildLogic 1.2.5 → 1.2.6，AAR 由新版发布插件生成
+- app 模块移除本地 composeCompiler.includeComposeMappingFile 配置段，Kotlin 2.3+ Compose 堆栈映射警告处理逻辑已内聚到 skyBuildLogic 1.2.6，避免重复
+
 ## [v1.0.6] - 2026-09-18
 - 新增 SkyViewPage（分页容器）：手动测量/放置实现，支持水平/垂直方向、pageCache 页面缓存、pagerKey 稳定键、contentTransformation 内容变换（内置缩放）、pageAnimationSpec 自定义翻页动画；SkyViewPageState 提供索引/偏移的 State 与 Flow 监听、代码翻页（有/无动画）
 - 新增 SkyBanner（无限轮播）：基于 SkyViewPage 的伪无限循环（内部索引放大 + 取模还原），autoScroll/autoScrollTime 自动轮播、拖拽暂停松手恢复；SkyBannerState 暴露真实索引，setPageIndexWithAnimate 相邻页平滑翻页

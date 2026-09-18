@@ -33,16 +33,6 @@ android {
     }
 }
 
-// Kotlin 2.3+ 的 Compose 编译器会在 R8 混淆时向 mapping 文件追加 group key 映射条目，
-// 并由 report<Variant>ComposeMappingErrors 任务收集校验。该收集器的 tokenizer 存在缺陷
-// （Google IssueTracker 555304803），遇到含 $ 嵌套类、<clinit> 等签名时会输出大量
-// "Failed to collect Compose stack trace mapping (Failed to tokenize ...)" 警告。
-// 项目未启用 GroupKeys 诊断堆栈模式（Composer.setDiagnosticStackTraceMode），该映射无实际用途，
-// 故按官方建议整体关闭此功能以消除签名打包时的警告。
-composeCompiler {
-    includeComposeMappingFile.set(false)
-}
-
 dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material.icons.extended)
