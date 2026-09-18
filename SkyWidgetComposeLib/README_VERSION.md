@@ -1,3 +1,12 @@
+## [v1.0.6] - 2026-09-18
+- 新增 SkyViewPage（分页容器）：手动测量/放置实现，支持水平/垂直方向、pageCache 页面缓存、pagerKey 稳定键、contentTransformation 内容变换（内置缩放）、pageAnimationSpec 自定义翻页动画；SkyViewPageState 提供索引/偏移的 State 与 Flow 监听、代码翻页（有/无动画）
+- 新增 SkyBanner（无限轮播）：基于 SkyViewPage 的伪无限循环（内部索引放大 + 取模还原），autoScroll/autoScrollTime 自动轮播、拖拽暂停松手恢复；SkyBannerState 暴露真实索引，setPageIndexWithAnimate 相邻页平滑翻页
+- 新增 SkyPageIndicator（页面指示器）：SkyPageIndexSource 单一入口零配置联动 ViewPage/Banner，工厂函数可适配任意页码来源；内置圆点/下划线/数字三种样式，itemContent 支持完全自定义
+- 新增 SkySwipeMenu（侧滑菜单）：Animatable 进度 + 惯性预测吸附，threshold/direction 可配，SwipeState 代码开合与 isOpen 查询，rememberSaveable 状态恢复；背景高度跟随内容层，兼容无界高度容器
+- 构建增强：启用 Library/App release R8 混淆（enableLibraryMinify/enableAppMinify）；keep 规则重构为 keepRules（公开 API 单一事实源，随 AAR 分发）+ minifyRules（自身 R8 元数据规则）双目录
+- 示例应用：新增 ViewPage、Banner、侧滑菜单示例页与首页入口
+- 同步更新 README_DOC.md（新增上述四组件章节与目录项）
+
 ## [v1.0.5] - 2026-09-16
 - 新增 SkyBottomSheet（底部弹窗）：基于 Material3 ModalBottomSheet 实现；SkyBottomSheetState 提供 show/hide/animateTo/isVisible；支持 initialValue 初始锚点（Hidden/HalfExpanded/Expanded）；容器背景色 sheetBackgroundColor、顶部圆角 sheetCornerRadius、modifier 可自定义
 - 新增 SkyNumberKeyBoard（数字键盘）：经 SkyBottomSheet 弹出或内嵌页面（asBottomSheet）；随机乱序键盘（0-9 全部参与乱序）、showDot 控制小数点键、deleteIcon 支持 SkyKeyBoardIcon.Vector/IconFont 双形式、确认键自定义（confirmText/confirmModifier/confirmDisable）、按键尺寸与间距可调

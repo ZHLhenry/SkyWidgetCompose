@@ -1,7 +1,7 @@
 [versions]
-skyBuildLogic = "1.2.4"
+skyBuildLogic = "1.2.5"
 skymvi = "1.0.1"
-skyWidgetCompose = "1.0.5"
+skyWidgetCompose = "1.0.6"
 activityCompose = "1.13.0"
 lottieCompose = "6.7.1"
 pagingCompose = "3.5.1"

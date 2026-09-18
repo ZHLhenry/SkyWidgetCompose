@@ -1,0 +1,10 @@
+# ============================================================
+# SkyWidgetComposeLib 自身 R8（pass 1）专属规则
+#
+# 消费者直接对混淆后的 classes.jar 编译，泛型签名、运行时注解
+# （Kotlin @Metadata、Compose 注解等）、内部类信息必须保留，
+# 否则消费方 kotlinc / Compose 编译器解析失败。
+# 本目录不在 keepRules 下，故不会打包进 AAR 的 proguard.txt，
+# 不会泄漏进消费者 App 的 R8 配置。
+# ============================================================
+-keepattributes Signature, *Annotation*, InnerClasses, EnclosingMethod

@@ -69,7 +69,7 @@ fun AppRoot() {
             Screen.Refresh, Screen.StateLayout, Screen.Signature, Screen.AnnotatedText,
             Screen.Grid, Screen.Marquee, Screen.Badge, Screen.IconFont, Screen.Image,
             Screen.QRCode, Screen.RatingBar, Screen.VerifyCode, Screen.NumberKeyBoard,
-            Screen.BottomSheet -> Screen.Home
+            Screen.BottomSheet, Screen.ViewPage, Screen.Banner, Screen.SwipeMenu -> Screen.Home
             else -> Screen.Refresh
         }
     }
@@ -109,6 +109,9 @@ fun AppRoot() {
         Screen.VerifyCode -> VerifyCodeDemoScreen(onBack = { currentPage = Screen.Home })
         Screen.NumberKeyBoard -> NumberKeyBoardDemoScreen(onBack = { currentPage = Screen.Home })
         Screen.BottomSheet -> BottomSheetDemoScreen(onBack = { currentPage = Screen.Home })
+        Screen.ViewPage -> ViewPageDemoScreen(onBack = { currentPage = Screen.Home })
+        Screen.Banner -> BannerDemoScreen(onBack = { currentPage = Screen.Home })
+        Screen.SwipeMenu -> SwipeMenuDemoScreen(onBack = { currentPage = Screen.Home })
     }
 }
 
@@ -144,6 +147,9 @@ sealed interface Screen {
     data object VerifyCode : Screen
     data object NumberKeyBoard : Screen
     data object BottomSheet : Screen
+    data object ViewPage : Screen
+    data object Banner : Screen
+    data object SwipeMenu : Screen
 }
 
 /**
@@ -184,6 +190,9 @@ fun HomeScreen(onNavigate: (Screen) -> Unit) {
             ComponentItem("验证码", "\uD83D\uDC22"),    // 🔢 数字输入
             ComponentItem("数字键盘", "\uD83D\uDD22"),  // 🔢 数字键盘
             ComponentItem("底部弹窗", "\u2B07\uFE0F"),      // ⬇️ 底部弹出
+            ComponentItem("分页容器", "\uD83D\uDCD1"),      // 📑 分页/ViewPager
+            ComponentItem("轮播图", "\uD83C\uDFA0"),        // 🎠 循环轮播 Banner
+            ComponentItem("侧滑菜单", "\u2B05\uFE0F"),      // ⬅️ 侧滑露出菜单
         )
 
         SkyGridLayout(
@@ -212,6 +221,9 @@ fun HomeScreen(onNavigate: (Screen) -> Unit) {
                         "验证码" -> onNavigate(Screen.VerifyCode)
                         "数字键盘" -> onNavigate(Screen.NumberKeyBoard)
                         "底部弹窗" -> onNavigate(Screen.BottomSheet)
+                        "分页容器" -> onNavigate(Screen.ViewPage)
+                        "轮播图" -> onNavigate(Screen.Banner)
+                        "侧滑菜单" -> onNavigate(Screen.SwipeMenu)
                     }
                 }
             )

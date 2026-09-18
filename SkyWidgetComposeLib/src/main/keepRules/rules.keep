@@ -1,12 +1,32 @@
-# Add project specific R8 rules here.
-# AGP will combine all keep rule files in src/main/keepRules to pass to R8
+# ============================================================
+# SkyWidgetComposeLib 公开 API keep 清单（单一事实源）
 #
-# For more details, see
-#   https://d.android.com/r/tools/r8/keep-rules
-
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# 本文件同时注入两次 R8 pass，避免同一清单维护两份：
+#  1) 消费者 App 的 R8：AGP 自动把 keepRules 目录打包进 AAR 的 proguard.txt
+#     随 AAR 分发，消费者开启混淆时自动生效；
+#  2) Library 自身 release 混淆：由约定插件显式汇总进 proguardFiles，
+#     保证 classes.jar 中公开 API 不被裁剪/改名。
+#
+# 此处只放公开 API 表面；仅 pass 1 有意义的元数据规则（keepattributes 等）
+# 放在 ../minifyRules/，不得放入本目录，避免泄漏进消费者 App 的 R8 配置。
+# ============================================================
+-keep public class com.sky.widget.badge.** { public *; }
+-keep public class com.sky.widget.banner.** { public *; }
+-keep public class com.sky.widget.bottomSheet.** { public *; }
+-keep public class com.sky.widget.grid.** { public *; }
+-keep public class com.sky.widget.iconfont.** { public *; }
+-keep public class com.sky.widget.image.** { public *; }
+-keep public class com.sky.widget.keyboard.** { public *; }
+-keep public class com.sky.widget.marqueeView.** { public *; }
+-keep public class com.sky.widget.pageIndicator.** { public *; }
+-keep public class com.sky.widget.qrcode.Sky* { public *; }
+-keep public class com.sky.widget.ratingbar.** { public *; }
+-keep public class com.sky.widget.refresh.Sky* { public *; }
+-keep public class com.sky.widget.refresh.header.Sky* { public *; }
+-keep public class com.sky.widget.refresh.footer.Sky* { public *; }
+-keep public class com.sky.widget.signatureView.** { public *; }
+-keep public class com.sky.widget.stateLayout.** { public *; }
+-keep public class com.sky.widget.swipe.** { public *; }
+-keep public class com.sky.widget.text.** { public *; }
+-keep public class com.sky.widget.verifycode.** { public *; }
+-keep public class com.sky.widget.viewpage.** { public *; }

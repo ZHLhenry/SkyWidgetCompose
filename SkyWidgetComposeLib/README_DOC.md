@@ -1,6 +1,6 @@
 # SkyWidgetCompose 文档
 
-SkyWidgetCompose 是一组基于 Jetpack Compose 的通用 UI 组件库，覆盖刷新、徽章、网格、签名板、页面状态、高亮文本、跑马灯等常见场景。
+SkyWidgetCompose 是一组基于 Jetpack Compose 的通用 UI 组件库，覆盖刷新、徽章、网格、签名板、页面状态、高亮文本、跑马灯、分页容器、轮播、页面指示器、侧滑菜单等常见场景。
 
 ---
 
@@ -22,6 +22,10 @@ SkyWidgetCompose 是一组基于 Jetpack Compose 的通用 UI 组件库，覆盖
 - [SkyNumberKeyBoard（数字键盘）](#skynumberkeyboard数字键盘)
 - [SkyRatingBar（评分条）](#skyratingbar评分条)
 - [SkyVerifyCodeEdit（验证码输入框）](#skyverifycodeedit验证码输入框)
+- [SkyViewPage（分页容器）](#skyviewpage分页容器)
+- [SkyBanner（无限轮播）](#skybanner无限轮播)
+- [SkyPageIndicator（页面指示器）](#skypageindicator页面指示器)
+- [SkySwipeMenu（侧滑菜单）](#skyswipemenu侧滑菜单)
 
 ---
 
@@ -33,7 +37,7 @@ SkyWidgetCompose 是一组基于 Jetpack Compose 的通用 UI 组件库，覆盖
 
 ```kotlin
 dependencies {
-    implementation("com.sky.lib:SkyWidgetCompose:1.0.5")
+    implementation("com.sky.lib:SkyWidgetCompose:1.0.6")
 }
 ```
 
@@ -1076,6 +1080,236 @@ SkyVerifyCodeEdit(count = 4, type = SkyVerifyType.Square) { code ->
 
 ---
 
+## SkyViewPage（分页容器）
+
+可滑动分页容器：与 Compose 官方 HorizontalPager 不同，通过手动测量 + 放置子项实现分页，
+支持水平/垂直方向、页面缓存、内容变换（如缩放）以及拖拽事件监听等能力。
+
+### API
+
+```kotlin
+@Composable
+fun SkyViewPage(
+    pageCount: Int,
+    modifier: Modifier = Modifier,
+    state: SkyViewPageState = rememberSkyViewPageState(),
+    orientation: Orientation = Orientation.Horizontal,
+    userEnable: Boolean = true,
+    pageCache: Int = 1,
+    scrollableInteractionSource: SkyDragInteractionSource? = null,
+    pagerKey: (index: Int) -> Any = { it },
+    clip: Boolean = true,
+    contentTransformation: SkyPagerContentTransformation = NoSkyPagerContentTransformation,
+    pageAnimationSpec: AnimationSpec<Float> = spring(),
+    content: @Composable SkyViewPageScope.() -> Unit
+)
+```
+
+### 关键概念
+
+| 名称 | 说明 |
+|------|------|
+| `SkyViewPageState` | 分页状态控制器：`getCurrSelectIndex()` / `getCurrSelectIndexState()` / `createCurrSelectIndexFlow()` 读取与监听索引；`setPageIndex()`（无动画）/ `setPageIndexWithAnimate()`（有动画）代码翻页；`getOffsetState()` / `createChildOffsetPercentFlow()` 监听滑动偏移 |
+| `SkyViewPageScope` | 每页内容的作用域，`index` 为当前页索引 |
+| `pageCache` | 当前页左右（或上下）各缓存的页数，默认 1，不建议过大 |
+| `pagerKey` | 为每一页提供稳定 key，减少重组，效果等同 LazyColumn items 的 key |
+| `scrollableInteractionSource` | `SkyDragInteractionSource` 拖拽监听源，可感知用户开始/结束/取消滑动 |
+| `contentTransformation` | 页面内容变换策略，内置 `rememberScalePagerContentTransformation(maxScale, minScale)` 缩放效果 |
+| `pageAnimationSpec` | 翻页/回弹动画曲线，可传 tween / spring 等任意 `AnimationSpec` |
+| `SkyPageIndexSource` | `SkyViewPageState` 已实现该接口，可直接传给 [SkyPageIndicator](#skypageindicator页面指示器) 零配置联动 |
+
+### 基础用法
+
+```kotlin
+val state = rememberSkyViewPageState()
+
+SkyViewPage(pageCount = 5, state = state) {
+    // this: SkyViewPageScope，index 为当前页索引
+    Box(Modifier.fillMaxSize().background(colors[index % colors.size])) {
+        Text("第 $index 页")
+    }
+}
+```
+
+---
+
+## SkyBanner（无限轮播）
+
+可自动循环轮播的 Banner，基于 [SkyViewPage](#skyviewpage分页容器) 实现无限轮播：
+内部把真实页数放大为“伪无限”分页，并借助索引取模映射把内部原始索引还原为真实数据索引，
+因此 content 始终只感知 `[0, pageCount)` 的真实索引；滑到尽头时自动跳回中间基准位置续接，用户无感知。
+
+### API
+
+```kotlin
+@Composable
+fun SkyBanner(
+    pageCount: Int,
+    modifier: Modifier = Modifier,
+    bannerState: SkyBannerState = rememberSkyBannerState(),
+    orientation: Orientation = Orientation.Horizontal,
+    userEnable: Boolean = true,
+    autoScroll: Boolean = true,
+    autoScrollTime: Long = 3000,
+    bannerKey: (index: Int) -> Any = { it },
+    clip: Boolean = true,
+    contentTransformation: SkyPagerContentTransformation = NoSkyPagerContentTransformation,
+    pageAnimationSpec: AnimationSpec<Float> = spring(),
+    content: @Composable SkyBannerScope.() -> Unit,
+)
+```
+
+### 关键概念
+
+| 名称 | 说明 |
+|------|------|
+| `autoScroll` / `autoScrollTime` | 是否自动轮播与间隔毫秒数；仅当 `pageCount > 1` 时才真正滚动 |
+| 拖拽暂停 | 用户开始拖拽时自动暂停轮播，松手（结束/取消）后恢复 |
+| `SkyBannerState` | 轮播状态控制器：`getCurrSelectIndex()` 读取真实索引（已取模）；`setPageIndex()` / `setPageIndexWithAnimate()` 代码翻页（相邻页触发平滑翻页动画，非相邻页退化为无动画跳转）；同样提供索引 State / Flow 与偏移监听 |
+| `SkyBannerScope` | 每页内容的作用域，`index` 为真实页索引 |
+| `pageCount <= 0` | 不渲染任何内容；`pageCount == 1` 时不自动轮播 |
+
+### 基础用法
+
+```kotlin
+val bannerState = rememberSkyBannerState()
+
+SkyBanner(pageCount = banners.size, bannerState = bannerState, autoScrollTime = 3000) {
+    // this: SkyBannerScope，index 为真实页索引
+    BannerItem(banners[index])
+}
+```
+
+---
+
+## SkyPageIndicator（页面指示器）
+
+页面指示器：当前页与总页数均从 `state` 自动读取，零配置联动。
+组件本身只关心“布局”（按总页数重复绘制每一项、排列方向、间距、主轴居中），
+不关心“每一项长什么样”，每一项的绘制完全可自定义。
+
+### API
+
+```kotlin
+@Composable
+fun SkyPageIndicator(
+    state: SkyPageIndexSource,
+    modifier: Modifier = Modifier,
+    orientation: Orientation = Orientation.Horizontal,
+    spacing: Dp = 6.dp,
+    itemContent: (@Composable SkyPageIndicatorScope.() -> Unit)? = null,
+)
+
+interface SkyPageIndexSource {
+    val currentIndexState: State<Int>
+    val pageCount: Int
+}
+
+// 工厂函数：把任意“当前索引 State + 总页数”适配为页码来源
+fun SkyPageIndexSource(currentIndexState: State<Int>, pageCount: Int): SkyPageIndexSource
+```
+
+### 关键概念
+
+| 名称 | 说明 |
+|------|------|
+| `SkyPageIndexSource` | 页码来源抽象；`SkyViewPageState`、`SkyBannerState` 均已实现，可直接传入实现零配置联动 |
+| 外部页码适配 | 非 Sky 分页组件（如 HorizontalPager）可用工厂函数一行适配：`SkyPageIndexSource(remember { derivedStateOf { pagerState.currentPage } }, pagerState.pageCount)` |
+| `SkyPageIndicatorScope` | 每一项的绘制作用域：`count` 总页数、`currentIndex` 当前页、`index` 当前绘制项、`selected` 是否选中 |
+| `itemContent` | 为 null 时默认圆点样式；否则完全由消费者绘制 |
+
+### 内置样式
+
+三种内置样式均为 `SkyPageIndicatorScope` 的扩展 Composable，颜色/尺寸参数在各自 Item 上配置：
+
+| 样式 | 效果 | 主要参数 |
+|------|------|---------|
+| `SkyDotIndicatorStyle`（默认） | 圆点，选中项放大并高亮 | selectedColor / unselectedColor / selectedSize / unselectedSize |
+| `SkyUnderlineIndicatorStyle` | 圆角横条，选中项加粗，形似 Tab 下划线 | selectedColor / unselectedColor / width / selectedHeight / unselectedHeight |
+| `SkyNumberIndicatorStyle` | 页码数字，选中项高亮圆形底 + 白色数字 | selectedColor / unselectedColor / size / textSize |
+
+### 基础用法
+
+```kotlin
+val bannerState = rememberSkyBannerState()
+
+SkyBanner(pageCount = 5, bannerState = bannerState) { /* ... */ }
+
+// 默认圆点样式
+SkyPageIndicator(state = bannerState)
+
+// 内置下划线 / 数字样式
+SkyPageIndicator(state = bannerState) { SkyUnderlineIndicatorStyle() }
+SkyPageIndicator(state = bannerState) { SkyNumberIndicatorStyle() }
+
+// 完全自定义每一项
+SkyPageIndicator(state = bannerState) {
+    Box(Modifier.size(if (selected) 12.dp else 6.dp).background(if (selected) Color.Red else Color.Gray, CircleShape))
+}
+```
+
+---
+
+## SkySwipeMenu（侧滑菜单）
+
+侧滑菜单：内容层可水平拖拽滑出，露出底层的背景菜单（如删除 / 置顶等操作按钮）。
+基于 `Animatable` 维护“打开进度”（0 = 完全关闭，背景菜单宽度 = 完全打开），
+手势经 foundation 的 `draggable` 捕获，松手时把惯性速度折算成预测位移后与阈值比较，决定吸附到打开或关闭；
+内容层与背景层均通过 `Modifier.offset` 平移，避免拖拽过程触发重新布局。
+
+### API
+
+```kotlin
+@Composable
+fun SkySwipeMenu(
+    modifier: Modifier = Modifier,
+    state: SwipeState = rememberSwipeState(),
+    threshold: Float = 0.3f,
+    direction: SwipeDirection = SwipeDirection.RightToLeft,
+    onChange: ((open: Boolean) -> Unit)? = null,
+    background: @Composable () -> Unit,
+    content: @Composable () -> Unit,
+)
+
+enum class SwipeDirection { LeftToRight, RightToLeft }
+enum class SwipeValue { Hidden, Open }
+
+@Composable
+fun rememberSwipeState(initialValue: SwipeValue = SwipeValue.Hidden): SwipeState
+```
+
+### 关键概念
+
+| 名称 | 说明 |
+|------|------|
+| `threshold` | 打开判定阈值比例，范围 (0, 1)；松手时进度超过 `背景宽度 × threshold` 即吸附为打开 |
+| `direction` | 背景菜单出现方向：`RightToLeft` 菜单在右侧（内容向左滑出，默认）/ `LeftToRight` 相反 |
+| `SwipeState` | 侧滑状态控制器：`open()` / `close()` 代码开合（suspend，带动画）；`isOpen` / `currentValue` 响应式查询 |
+| `rememberSwipeState` | 基于 `rememberSaveable`，配置变化 / 进程恢复时保持打开状态；`initialValue` 指定初始开合 |
+| `onChange` | 打开状态变化回调（首次组合也会回调一次） |
+| 尺寸约定 | 背景菜单宽度决定完全打开时内容层让出的距离；容器高度由内容层决定，背景层高度自动跟随（兼容 LazyColumn / verticalScroll 等无界高度容器） |
+
+### 基础用法
+
+```kotlin
+val swipeState = rememberSwipeState()
+
+SkySwipeMenu(
+    state = swipeState,
+    background = {
+        Row {
+            Button(onClick = { scope.launch { swipeState.close() } }) { Text("置顶") }
+            Button(onClick = { onDelete() }) { Text("删除") }
+        }
+    },
+) {
+    // 前景内容（列表行等）
+    ListItem(/* ... */)
+}
+```
+
+---
+
 ## 附录：库资源前缀
 
 库内字符串 / 颜色资源统一使用前缀 `sky_rl_*`，R 文件路径为 `com.sky.widget.R`。
@@ -1085,7 +1319,7 @@ SkyVerifyCodeEdit(count = 4, type = SkyVerifyType.Square) { code ->
 ## 附录：发布坐标
 
 ```groovy
-implementation "com.sky.lib:SkyWidgetCompose:1.0.5"
+implementation "com.sky.lib:SkyWidgetCompose:1.0.6"
 ```
 
 发布仓库与凭证来自 `local.properties` 中的 `mavenCentral.*` 配置；发布账号与仓库读取账号不同，请勿混用。
