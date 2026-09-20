@@ -1,10 +1,11 @@
 [versions]
 skyBuildLogic = "1.2.6"
 skymvi = "1.0.1"
-skyWidgetCompose = "1.0.7"
+skyWidgetCompose = "1.0.9"
 activityCompose = "1.13.0"
 lottieCompose = "6.7.1"
 pagingCompose = "3.5.1"
+coilCompose = "2.7.0"
 hiltLifecycleViewModelCompose = "1.4.0"
 camerax = "1.6.2"
 xlog = "1.11.1"
@@ -22,6 +23,8 @@ androidx-compose-material-icons-extended = { group = "androidx.compose.material"
 lottie-compose = { group = "com.airbnb.android", name = "lottie-compose", version.ref = "lottieCompose" }
 skyWidgetCompose = { module = "com.sky.lib:SkyWidgetCompose", version.ref = "skyWidgetCompose" }
 androidx-paging-compose = { group = "androidx.paging", name = "paging-compose", version.ref = "pagingCompose" }
+coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coilCompose" }
+coil-gif = { group = "io.coil-kt", name = "coil-gif", version.ref = "coilCompose" }
 
 androidx-camera-core = { group = "androidx.camera", name = "camera-core", version.ref = "camerax" }
 androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "camerax" }

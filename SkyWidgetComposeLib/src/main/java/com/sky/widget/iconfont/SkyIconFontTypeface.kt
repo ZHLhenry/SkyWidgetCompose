@@ -1,6 +1,5 @@
 package com.sky.widget.iconfont
 
-import android.content.Context
 import android.graphics.Typeface
 import androidx.compose.ui.text.font.FontFamily
 
@@ -54,13 +53,6 @@ internal class SkyIconFontTypeface(
 
     val iconCount: Int
         get() = characters.size
-
-    /** 字体描述 */
-    val description: String
-        get() {
-            ensureJsonLoaded()
-            return _jsonResult!!.description
-        }
 
     /** 名称→字符映射（来自 JSON 解析结果） */
     val characters: Map<String, Char>

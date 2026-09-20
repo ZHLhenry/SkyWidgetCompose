@@ -3,15 +3,14 @@ package com.sky.widget.ratingbar
 import android.annotation.SuppressLint
 import android.view.MotionEvent
 import androidx.annotation.FloatRange
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.GenericShape
-import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -20,9 +19,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.layout.onSizeChanged
@@ -31,41 +33,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import com.sky.widget.iconfont.SkyIconFont
+import com.sky.widget.iface.SkyIconType
 import kotlin.math.floor
 import kotlin.math.round
-
-/**
- * 评分条图标模型：统一抽象 [SkyRatingBar] 选中 / 未选中图标的来源。
- *
- * - [Vector]：Compose [ImageVector] 矢量图标；
- * - [Iconfont]：iconfont 字体图标，按图标名称渲染。
- */
-@Immutable
-sealed interface SkyRatingIcon {
-
-    /**
-     * Compose [ImageVector] 矢量图标
-     *
-     * @property imageVector 矢量图标
-     */
-    @Immutable
-    data class Vector(val imageVector: ImageVector) : SkyRatingIcon
-
-    /**
-     * iconfont 字体图标。
-     *
-     * 使用前需先在 Application 中调用
-     * [com.sky.widget.iconfont.SkyIconFontsLib.initRegister] 注册字体，否则渲染时抛异常。
-     *
-     * @property iconName 图标名称（带前缀，如 `skywujiaoxingxuanzhong`）
-     * @property fontName 可选：指定字体（TTF 文件名，不含 `.ttf`，如 `sky_iconfont`）；不传使用默认字体
-     */
-    @Immutable
-    data class Iconfont(
-        val iconName: String,
-        val fontName: String? = null
-    ) : SkyRatingIcon
-}
 
 /**
  * 评分条组件：支持点击 / 滑动打分、整星与半星、只读展示。
@@ -75,14 +45,22 @@ sealed interface SkyRatingIcon {
  *
  * 使用示例：
  * ```kotlin
- * // 默认内置五角星（ImageVector），开箱即用
+ * // 默认内置五角星（[Painter]），开箱即用
  * SkyRatingBar(value = rating, onChange = { rating = it })
+ *
+ * // 自定义矢量图标（ImageVector 需经 rememberVectorPainter 包装为 Painter）
+ * SkyRatingBar(
+ *     value = rating,
+ *     activeIcon = SkyIconType.painter(rememberVectorPainter(Icons.Filled.Favorite)),
+ *     normalIcon = SkyIconType.painter(rememberVectorPainter(Icons.Filled.FavoriteBorder)),
+ *     onChange = { rating = it }
+ * )
  *
  * // iconfont 图标（需先注册字体）
  * SkyRatingBar(
  *     value = rating,
- *     activeIcon = SkyRatingIcon.Iconfont("skywujiaoxingxuanzhong"),
- *     normalIcon = SkyRatingIcon.Iconfont("skywujiaoxingweixuanzhong"),
+ *     activeIcon = SkyIconType.iconFont("skywujiaoxingxuanzhong"),
+ *     normalIcon = SkyIconType.iconFont("skywujiaoxingweixuanzhong"),
  *     onChange = { rating = it }
  * )
  * ```
@@ -93,8 +71,8 @@ sealed interface SkyRatingIcon {
  * @param value 当前分值；传 [Float.NaN] 时不绘制选中层（仅展示 normal 图标）
  * @param activeColor 选中图标着色
  * @param normalColor 未选中图标着色
- * @param activeIcon 选中图标，支持 [SkyRatingIcon.Vector] 与 [SkyRatingIcon.Iconfont]，默认内置五角星
- * @param normalIcon 未选中图标，支持 [SkyRatingIcon.Vector] 与 [SkyRatingIcon.Iconfont]，默认内置五角星
+ * @param activeIcon 选中图标，支持 [SkyIconType.PainterIcon]（任意 [Painter]，如 `rememberVectorPainter` 包装的 [ImageVector]）与 [SkyIconType.FontIcon]（iconfont 图标名），默认内置五角星
+ * @param normalIcon 未选中图标，支持 [SkyIconType.PainterIcon] 与 [SkyIconType.FontIcon]，默认内置五角星
  * @param allowHalf 是否允许半星（0.5 步进）
  * @param readOnly 是否只读（禁用点击与滑动手势）
  * @param onChange 分值变化回调
@@ -107,8 +85,8 @@ fun SkyRatingBar(
     @SuppressLint("Range") @FloatRange(from = 0.0) value: Float = Float.NaN,
     activeColor: Color = Color(0xFFF7BA2A),
     normalColor: Color = Color(0xFFC6D1DE),
-    activeIcon: SkyRatingIcon = SkyRatingIcon.Vector(DefaultStarIcon),
-    normalIcon: SkyRatingIcon = SkyRatingIcon.Vector(DefaultStarIcon),
+    activeIcon: SkyIconType = DefaultStarIconType,
+    normalIcon: SkyIconType = DefaultStarIconType,
     allowHalf: Boolean = false,
     readOnly: Boolean = false,
     onChange: (value: Float) -> Unit
@@ -203,24 +181,24 @@ fun SkyRatingBar(
 }
 
 /**
- * 渲染单个评分图标：按 [SkyRatingIcon] 类型分发到矢量图标或 iconfont 渲染
+ * 渲染单个评分图标：按 [SkyIconType] 类型分派到 [Painter] 图片或 iconfont 渲染
  */
 @Composable
 private fun SkyRatingIconSlot(
-    icon: SkyRatingIcon,
+    icon: SkyIconType,
     tint: Color,
     size: DpSize,
     modifier: Modifier = Modifier
 ) {
     when (icon) {
-        is SkyRatingIcon.Vector -> Icon(
-            imageVector = icon.imageVector,
+        is SkyIconType.PainterIcon -> Image(
+            painter = icon.painter,
             contentDescription = "SkyRatingIcon",
-            tint = tint,
+            colorFilter = ColorFilter.tint(tint),
             modifier = modifier.size(size)
         )
 
-        is SkyRatingIcon.Iconfont -> {
+        is SkyIconType.FontIcon -> {
             // iconfont 以字号控制图标大小，取宽高中较小值换算，保证 glyph 完整落在尺寸内
             val fontSize = with(LocalDensity.current) { minOf(size.width, size.height).toSp() }
             SkyIconFont(
@@ -265,7 +243,10 @@ private fun Float.stepToHalf(): Float {
 }
 
 /**
- * 内置默认五角星矢量图标（Material Star 路径），无需注册字体即可开箱即用
+ * 内置默认五角星 [ImageVector]（Material Star 路径），无需注册字体即可开箱即用。
+ *
+ * 渲染层在 [DefaultStarIconType] 中通过 [rememberVectorPainter] 转为 [Painter]，
+ * 再以 [SkyIconType.PainterIcon] 装配；着色调色由 [ColorFilter.tint] 统一应用 `activeColor` / `normalColor`。
  */
 private val DefaultStarIcon: ImageVector by lazy(LazyThreadSafetyMode.NONE) {
     ImageVector.Builder(
@@ -281,3 +262,15 @@ private val DefaultStarIcon: ImageVector by lazy(LazyThreadSafetyMode.NONE) {
         fill = SolidColor(Color.Black)
     ).build()
 }
+
+/**
+ * 默认五角星 [PainterIcon]：在 Composable 内用 [rememberVectorPainter] 包装 [DefaultStarIcon]。
+ *
+ * 仅 [SkyRatingBar] 内部消费（`internal`），避免泄漏到公开 API。
+ */
+internal val DefaultStarIconType: SkyIconType
+    @Composable
+    get() {
+        val painter = rememberVectorPainter(DefaultStarIcon)
+        return remember(painter) { SkyIconType.PainterIcon(painter) }
+    }

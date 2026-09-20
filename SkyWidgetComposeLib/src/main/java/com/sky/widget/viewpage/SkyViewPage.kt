@@ -427,7 +427,7 @@ private fun getPagerKey(
     pagerKey: (index: Int) -> Any,
     pageCount: Int,
     index: Int,
-): Any = if (index < 0 || index >= pageCount) index else pagerKey(index)
+): Any = if (index !in 0..<pageCount) index else pagerKey(index)
 
 /**
  * 返回区间中值：把 [number] 限制在 [min, max] 之间。
@@ -551,7 +551,7 @@ class SkyViewPageState : SkyPageIndexSource {
     internal var pageChangeAnimFlag by mutableStateOf<PageChangeAnimFlag?>(null)
 
     /** 主轴方向的尺寸（水平为宽、垂直为高）。 */
-    internal var mainAxisSize by mutableStateOf(0)
+    internal var mainAxisSize by mutableIntStateOf(0)
 
     /** 记录当前 size，尺寸变化后自动滚动到正确位置（适配可改变窗口大小的场景）。 */
     internal var size by mutableStateOf(IntSize.Zero)
@@ -612,17 +612,20 @@ class SkyViewPageState : SkyPageIndexSource {
         offsetAnim.snapTo(offset - mainAxisSize * getCurrSelectIndex())
     }
 
-    /** 设置偏移量（有动画），offset 为相对于整体内容的绝对偏移。 */
+    /** 设置偏移量（有动画），offset 为相对于整体内容的绝对偏移。公开 API，供消费者调用 */
+    @Suppress("unused")
     suspend fun setOffsetWithAnimate(offset: Float) {
         offsetAnim.animateTo(offset - mainAxisSize * getCurrSelectIndex())
     }
 
-    /** 以主轴尺寸的百分比设置偏移量（无动画）。 */
+    /** 以主轴尺寸的百分比设置偏移量（无动画）。公开 API，供消费者调用 */
+    @Suppress("unused")
     suspend fun setOffsetPercent(percent: Float) {
         setOffset(percent * mainAxisSize)
     }
 
-    /** 获取当前索引的偏移百分比。 */
+    /** 获取当前索引的偏移百分比。公开 API，供消费者调用 */
+    @Suppress("unused")
     fun getCurrentOffsetPercent(): Float = getOffsetPercent(getCurrSelectIndex())
 
     /** 获取指定索引的偏移百分比：0 表示正好对齐，非 0 表示相对该页的偏移量。 */

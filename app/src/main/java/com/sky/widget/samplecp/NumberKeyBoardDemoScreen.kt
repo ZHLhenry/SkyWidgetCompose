@@ -35,7 +35,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sky.widget.bottomSheet.rememberBottomSheetState
-import com.sky.widget.keyboard.SkyKeyBoardIcon
+import com.sky.widget.iface.SkyIconType
 import com.sky.widget.keyboard.SkyNumberKeyBoard
 import com.sky.widget.samplecp.ui.theme.SkyWidgetComposeTheme
 import kotlinx.coroutines.launch
@@ -115,7 +115,7 @@ fun NumberKeyBoardDemoScreen(onBack: () -> Unit) {
             KeyBoardSection(title = "自定义删除图标")
             NumberKeyBoardItem(
                 title = "自定义删除图标",
-                deleteIcon = SkyKeyBoardIcon.IconFont("skygouxuanzhong")
+                deleteIcon = SkyIconType.iconFont("skygouxuanzhong")
             )
 
             // 示例 7：自定义弹窗圆角（顶部圆角半径由消费者定义）
@@ -183,7 +183,7 @@ private fun NumberKeyBoardItem(
     confirmText: String = "确定",
     confirmDisable: Boolean = false,
     showDot: Boolean = true,
-    deleteIcon: SkyKeyBoardIcon? = null,
+    deleteIcon: SkyIconType? = null,
     sheetCornerRadius: Dp = 28.dp,
     confirmModifier: Modifier = Modifier,
     itemHeight: Dp = 48.dp,

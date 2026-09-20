@@ -129,7 +129,6 @@ fun IconFontDemoScreen(onBack: () -> Unit) {
                         SkyIconFont(
                             iconName = name,
                             fontName = fontName,
-                            tint = Color(0xFF2196F3),
                             fontSize = 22.sp,
                             modifier = Modifier.size(28.dp)
                         )

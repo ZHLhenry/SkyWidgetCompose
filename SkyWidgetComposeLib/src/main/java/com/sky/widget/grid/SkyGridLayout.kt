@@ -78,11 +78,11 @@ fun <T> SkyGridLayout(
             return@Layout layout(constraints.maxWidth, constraints.minHeight) {}
         }
 
-        val placeables = measurables.map { measurable ->
+        val placeable = measurables.map { measurable ->
             measurable.measure(Constraints.fixedWidth(cellWidth))
         }
 
-        val rows = placeables.chunked(columnsCount)
+        val rows = placeable.chunked(columnsCount)
         val rowHeights = rows.map { row -> row.maxOfOrNull { it.height } ?: 0 }
         val totalHeight = topPadding + bottomPadding +
                 rowHeights.sum() + vGapPx * (rows.size - 1).coerceAtLeast(0)

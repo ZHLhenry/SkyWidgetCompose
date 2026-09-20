@@ -13,12 +13,15 @@
 -keep public class com.sky.widget.badge.** { public *; }
 -keep public class com.sky.widget.banner.** { public *; }
 -keep public class com.sky.widget.bottomSheet.** { public *; }
+-keep public class com.sky.widget.cell.** { public *; }
 -keep public class com.sky.widget.grid.** { public *; }
 -keep public class com.sky.widget.iconfont.** { public *; }
+-keep public class com.sky.widget.iface.** { public *; }
 -keep public class com.sky.widget.image.** { public *; }
 -keep public class com.sky.widget.keyboard.** { public *; }
 -keep public class com.sky.widget.marqueeView.** { public *; }
 -keep public class com.sky.widget.pageIndicator.** { public *; }
+-keep public class com.sky.widget.preview.** { public *; }
 -keep public class com.sky.widget.qrcode.Sky* { public *; }
 -keep public class com.sky.widget.ratingbar.** { public *; }
 -keep public class com.sky.widget.refresh.Sky* { public *; }
@@ -27,6 +30,7 @@
 -keep public class com.sky.widget.signatureView.** { public *; }
 -keep public class com.sky.widget.stateLayout.** { public *; }
 -keep public class com.sky.widget.swipe.** { public *; }
+-keep public class com.sky.widget.tabLayout.** { public *; }
 -keep public class com.sky.widget.text.** { public *; }
 -keep public class com.sky.widget.verifycode.** { public *; }
 -keep public class com.sky.widget.viewpage.** { public *; }

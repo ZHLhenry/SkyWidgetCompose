@@ -9,7 +9,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
-import androidx.compose.ui.unit.dp
 
 /**
  * 二维码扫描器状态。

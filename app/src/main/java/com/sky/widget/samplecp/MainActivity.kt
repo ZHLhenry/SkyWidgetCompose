@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -69,7 +71,8 @@ fun AppRoot() {
             Screen.Refresh, Screen.StateLayout, Screen.Signature, Screen.AnnotatedText,
             Screen.Grid, Screen.Marquee, Screen.Badge, Screen.IconFont, Screen.Image,
             Screen.QRCode, Screen.RatingBar, Screen.VerifyCode, Screen.NumberKeyBoard,
-            Screen.BottomSheet, Screen.ViewPage, Screen.Banner, Screen.SwipeMenu -> Screen.Home
+            Screen.BottomSheet, Screen.ViewPage, Screen.Banner, Screen.SwipeMenu, Screen.TabLayout,
+            Screen.CellLayout, Screen.PreView -> Screen.Home
             else -> Screen.Refresh
         }
     }
@@ -112,6 +115,9 @@ fun AppRoot() {
         Screen.ViewPage -> ViewPageDemoScreen(onBack = { currentPage = Screen.Home })
         Screen.Banner -> BannerDemoScreen(onBack = { currentPage = Screen.Home })
         Screen.SwipeMenu -> SwipeMenuDemoScreen(onBack = { currentPage = Screen.Home })
+        Screen.TabLayout -> TabLayoutDemoScreen(onBack = { currentPage = Screen.Home })
+        Screen.CellLayout -> CellDemoScreen(onBack = { currentPage = Screen.Home })
+        Screen.PreView -> PreViewDemoScreen(onBack = { currentPage = Screen.Home })
     }
 }
 
@@ -150,6 +156,9 @@ sealed interface Screen {
     data object ViewPage : Screen
     data object Banner : Screen
     data object SwipeMenu : Screen
+    data object TabLayout : Screen
+    data object CellLayout : Screen
+    data object PreView : Screen
 }
 
 /**
@@ -193,12 +202,18 @@ fun HomeScreen(onNavigate: (Screen) -> Unit) {
             ComponentItem("分页容器", "\uD83D\uDCD1"),      // 📑 分页/ViewPager
             ComponentItem("轮播图", "\uD83C\uDFA0"),        // 🎠 循环轮播 Banner
             ComponentItem("侧滑菜单", "\u2B05\uFE0F"),      // ⬅️ 侧滑露出菜单
+            ComponentItem("Tab布局", "▤"),            // ▤ 标签页/底部导航
+            ComponentItem("单元格", "≣"),            // ≣ 列表项/单元格
+            ComponentItem("图片预览", "🔍"),     // 🔍 放大镜/预览
         )
 
         SkyGridLayout(
             items = components,
             columns = 3,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .verticalScroll(rememberScrollState()),
             contentPadding = PaddingValues(1.dp),
             horizontalSpacing = 1.dp,
             verticalSpacing = 1.dp
@@ -224,6 +239,9 @@ fun HomeScreen(onNavigate: (Screen) -> Unit) {
                         "分页容器" -> onNavigate(Screen.ViewPage)
                         "轮播图" -> onNavigate(Screen.Banner)
                         "侧滑菜单" -> onNavigate(Screen.SwipeMenu)
+                        "Tab布局" -> onNavigate(Screen.TabLayout)
+                        "单元格" -> onNavigate(Screen.CellLayout)
+                        "图片预览" -> onNavigate(Screen.PreView)
                     }
                 }
             )

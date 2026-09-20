@@ -41,6 +41,9 @@ dependencies {
     implementation(libs.xlog)
     // 库的 SkyLottieRefreshHeader 为 compileOnly 依赖 Lottie，使用方需自行导包
     implementation(libs.lottie.compose)
+    // 库的 SkyPreView 为 compileOnly 依赖 Coil，使用方需自行导包（coil-gif 用于 GIF/WebP 动图）
+    implementation(libs.coil.compose)
+    implementation(libs.coil.gif)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)

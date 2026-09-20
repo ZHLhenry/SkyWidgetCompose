@@ -6,6 +6,62 @@
   "description": "",
   "glyphs": [
     {
+      "icon_id": "750883",
+      "name": "二维码",
+      "font_class": "erweima",
+      "unicode": "e7ad",
+      "unicode_decimal": 59309
+    },
+    {
+      "icon_id": "17048482",
+      "name": "跑马灯",
+      "font_class": "paomadeng",
+      "unicode": "e601",
+      "unicode_decimal": 58881
+    },
+    {
+      "icon_id": "35585510",
+      "name": "签名",
+      "font_class": "qianming",
+      "unicode": "e749",
+      "unicode_decimal": 59209
+    },
+    {
+      "icon_id": "4315691",
+      "name": "底部导航",
+      "font_class": "dibudaohang",
+      "unicode": "e617",
+      "unicode_decimal": 58903
+    },
+    {
+      "icon_id": "20617292",
+      "name": "字体图标",
+      "font_class": "zititubiao",
+      "unicode": "e600",
+      "unicode_decimal": 58880
+    },
+    {
+      "icon_id": "44710679",
+      "name": "圆形图片",
+      "font_class": "yuanxingtupian",
+      "unicode": "e6ea",
+      "unicode_decimal": 59114
+    },
+    {
+      "icon_id": "46125520",
+      "name": "比例图片",
+      "font_class": "bilitupian",
+      "unicode": "e656",
+      "unicode_decimal": 58966
+    },
+    {
+      "icon_id": "44027721",
+      "name": "角标badge",
+      "font_class": "badge",
+      "unicode": "e62b",
+      "unicode_decimal": 58923
+    },
+    {
       "icon_id": "796987",
       "name": "首页",
       "font_class": "shouye",

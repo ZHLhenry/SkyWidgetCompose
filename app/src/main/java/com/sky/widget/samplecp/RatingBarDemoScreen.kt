@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.DpSize
@@ -30,8 +31,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.sky.mvi.core.compose.SkyMviScreen
+import com.sky.widget.iface.SkyIconType
 import com.sky.widget.ratingbar.SkyRatingBar
-import com.sky.widget.ratingbar.SkyRatingIcon
 import com.sky.widget.samplecp.ratingbar.RatingUiIntent
 import com.sky.widget.samplecp.ratingbar.RatingUiState
 import com.sky.widget.samplecp.ratingbar.RatingViewModel
@@ -135,8 +136,8 @@ private fun RatingBarDemoContent(
                         value = state.vectorIconRating,
                         size = DpSize(24.dp, 24.dp),
                         activeColor = Color(0xFFE91E63),
-                        activeIcon = SkyRatingIcon.Vector(Icons.Filled.Favorite),
-                        normalIcon = SkyRatingIcon.Vector(Icons.Filled.FavoriteBorder),
+                        activeIcon = SkyIconType.painter(rememberVectorPainter(Icons.Filled.Favorite)),
+                        normalIcon = SkyIconType.painter(rememberVectorPainter(Icons.Filled.FavoriteBorder)),
                         onChange = { intent(RatingUiIntent.UpdateVectorIcon(it)) }
                     )
                 }
@@ -148,8 +149,8 @@ private fun RatingBarDemoContent(
                     SkyRatingBar(
                         value = state.customIconRating,
                         size = DpSize(24.dp, 24.dp),
-                        activeIcon = SkyRatingIcon.Iconfont("skygouxuanzhong"),
-                        normalIcon = SkyRatingIcon.Iconfont("skygouweixuanzhong"),
+                        activeIcon = SkyIconType.iconFont("skygouxuanzhong"),
+                        normalIcon = SkyIconType.iconFont("skygouweixuanzhong"),
                         onChange = { intent(RatingUiIntent.UpdateCustomIcon(it)) }
                     )
                 }
@@ -162,8 +163,8 @@ private fun RatingBarDemoContent(
                         value = state.customIconHalfRating,
                         size = DpSize(24.dp, 24.dp),
                         allowHalf = true,
-                        activeIcon = SkyRatingIcon.Iconfont("skywujiaoxingxuanzhong"),
-                        normalIcon = SkyRatingIcon.Iconfont("skywujiaoxingweixuanzhong"),
+                        activeIcon = SkyIconType.iconFont("skywujiaoxingxuanzhong"),
+                        normalIcon = SkyIconType.iconFont("skywujiaoxingweixuanzhong"),
                         onChange = { intent(RatingUiIntent.UpdateCustomIconHalf(it)) }
                     )
                 }

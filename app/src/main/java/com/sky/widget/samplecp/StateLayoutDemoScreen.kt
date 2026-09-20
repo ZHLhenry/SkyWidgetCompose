@@ -139,7 +139,7 @@ fun StateLayoutDemoScreen(onBack: () -> Unit) {
                 modifier = Modifier.weight(1f),
                 empty = { message ->
                     SkyEmptyWidget(
-                        image = {
+                        imageContent = {
                             Icon(
                                 imageVector = Icons.Outlined.Inbox,
                                 contentDescription = null,
@@ -154,7 +154,7 @@ fun StateLayoutDemoScreen(onBack: () -> Unit) {
                 },
                 error = { message ->
                     SkyErrorWidget(
-                        image = {
+                        imageContent = {
                             Icon(
                                 imageVector = Icons.Outlined.CloudOff,
                                 contentDescription = null,

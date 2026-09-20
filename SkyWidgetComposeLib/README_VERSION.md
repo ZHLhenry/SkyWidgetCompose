@@ -1,3 +1,13 @@
+## [v1.0.9] - 2026-09-20
+- 新增 SkyCellLayout（单元格布局）：纯 Compose/Material3 通用列表项，左图标 + 主标题/摘要 + 右详情/箭头，支持分割线、点击、minHeight；提供字符串版与全插槽版两个重载，右侧箭头 Canvas 自绘（不依赖 material-icons）
+- 新增 SkyTabLayout（标签布局）：SkyTabMode.Fixed 等分 / Scrollable 滑动，横向/纵向排列；复用 SkyBadgeState 角标；传入 pagerState 与 SkyViewPage 零胶水联动（选中自动跟随、点击自动翻页）；样式经 rememberSkyTabStyle 配置，itemContent/customContent 支持完全自定义
+- 新增 SkyPreView（图片预览）：基于 Coil + SkyViewPage，黑底全屏翻页、双指缩放/平移/双击放大，页码指示器与关闭按钮；models 支持 Coil 全部图片源混用；Coil 为 compileOnly（与 Lottie/Paging 一致，不传递），检测到 coil-gif 自动注册动图解码器
+- 新增 SkyIconType（统一图标类型）：PainterIcon/FontIcon 双实现 + painter/iconFont 工厂方法，替换原 SkyKeyBoardIcon、SkyRatingIcon，并统一用于 Cell/TabLayout/NumberKeyBoard/RatingBar/PreView 关闭按钮及 StateLayout 的 Empty/Error 图标
+- SkyEmptyWidget/SkyErrorWidget 新增 imageContent 插槽（优先级高于 image），image 支持 SkyIconType（Painter/iconfont，默认 64dp 渲染）；抽取库内共用 SkyStateWidget 基础布局
+- 修复 iconfont 解析：glyph 的 font_class 已含前缀时不再重复拼接 css_prefix_text
+- 构建增强：coil-compose/coil-gif 以 compileOnly 引入；SkyViewPage 偏移设置方法明确为公开 API
+- 示例应用：新增 Cell、TabLayout、PreView 示例页与首页入口
+
 ## [v1.0.7] - 2026-09-18
 - 构建工具链升级：skyBuildLogic 1.2.5 → 1.2.6，AAR 由新版发布插件生成
 - app 模块移除本地 composeCompiler.includeComposeMappingFile 配置段，Kotlin 2.3+ Compose 堆栈映射警告处理逻辑已内聚到 skyBuildLogic 1.2.6，避免重复

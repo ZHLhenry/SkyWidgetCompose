@@ -62,7 +62,10 @@ internal object IconfontJsonParser {
             if (codepoint !in 1..0xFFFF) {
                 throw IllegalArgumentException("glyph 'unicode' 值超出 BMP 范围: U+${codepoint.toString(16)}")
             }
-            result[prefix + fontClass] = codepoint.toChar()
+            // 兼容 font_class 已含前缀的情况（如 font_class="testSkytixi" 与 css_prefix_text="testSky"），
+            // 避免拼出 "testSkytestSkytixi" 导致按 "testSkytixi" 查询未命中
+            val key = if (fontClass.startsWith(prefix)) fontClass else prefix + fontClass
+            result[key] = codepoint.toChar()
         }
 
         return IconfontParseResult(result, name, prefix, description)

@@ -48,15 +48,13 @@ import androidx.compose.ui.Modifier
  * ```kotlin
  * @Composable
  * fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
- *     val state by viewModel
- *
  *     SkyPageStateLayout(
- *         pageState = state.pageState,
+ *         pageState = viewModel.pageState,
  *         onEmptyRetry = { viewModel.load() },
  *         onErrorRetry = { viewModel.load() }
  *     ) {
  *         LazyColumn {
- *             items(state.datas) { article ->
+ *             items(viewModel.datas) { article ->
  *                 ArticleItem(article)
  *             }
  *         }
@@ -73,7 +71,7 @@ import androidx.compose.ui.Modifier
  *     onErrorRetry = { viewModel.load() },
  *     empty = { message ->
  *         SkyEmptyWidget(
- *             image = {
+ *             imageContent = {
  *                 Icon(
  *                     imageVector = Icons.Outlined.Inbox,
  *                     contentDescription = null,

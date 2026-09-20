@@ -1,6 +1,6 @@
 # SkyWidgetCompose 文档
 
-SkyWidgetCompose 是一组基于 Jetpack Compose 的通用 UI 组件库，覆盖刷新、徽章、网格、签名板、页面状态、高亮文本、跑马灯、分页容器、轮播、页面指示器、侧滑菜单等常见场景。
+SkyWidgetCompose 是一组基于 Jetpack Compose 的通用 UI 组件库，覆盖刷新、徽章、网格、签名板、页面状态、高亮文本、跑马灯、分页容器、轮播、页面指示器、侧滑菜单、单元格、标签栏、图片预览等常见场景。
 
 ---
 
@@ -26,6 +26,9 @@ SkyWidgetCompose 是一组基于 Jetpack Compose 的通用 UI 组件库，覆盖
 - [SkyBanner（无限轮播）](#skybanner无限轮播)
 - [SkyPageIndicator（页面指示器）](#skypageindicator页面指示器)
 - [SkySwipeMenu（侧滑菜单）](#skyswipemenu侧滑菜单)
+- [SkyCellLayout（单元格布局）](#skycelllayout单元格布局)
+- [SkyTabLayout（标签布局）](#skytablayout标签布局)
+- [SkyPreView（图片预览）](#skypreview图片预览)
 
 ---
 
@@ -37,7 +40,7 @@ SkyWidgetCompose 是一组基于 Jetpack Compose 的通用 UI 组件库，覆盖
 
 ```kotlin
 dependencies {
-    implementation("com.sky.lib:SkyWidgetCompose:1.0.6")
+    implementation("com.sky.lib:SkyWidgetCompose:1.0.9")
 }
 ```
 
@@ -460,15 +463,55 @@ fun SkyPageStateLayout(
 ### 用法
 
 ```kotlin
-val state by viewModel
-
 SkyPageStateLayout(
-    pageState = state.pageState,
+    pageState = viewModel.pageState,
     onEmptyRetry = { viewModel.load() },   // Empty 占位点击重试
     onErrorRetry = { viewModel.load() }    // Error 占位点击重试
 ) {
     LazyColumn {
-        items(state.datas) { ArticleItem(it) }
+        items(viewModel.datas) { ArticleItem(it) }
+    }
+}
+```
+
+### 完整示例（覆盖全部参数）
+
+```kotlin
+SkyPageStateLayout(
+    pageState = viewModel.pageState,
+    modifier = Modifier.fillMaxSize(),
+    onEmptyRetry = { viewModel.load() },
+    onErrorRetry = { viewModel.load() },
+    // 加载态自定义（默认 SkyLoadingWidget 居中转圈）
+    loading = {
+        SkyLoadingWidget()
+    },
+    // 空态自定义（默认 SkyEmptyWidget），message 为 SkyPageState.Empty 携带的文案
+    empty = { message ->
+        SkyEmptyWidget(
+            // image 支持 SkyIconType：Painter 图片 / iconfont 图标（默认 64dp 渲染）
+            image = SkyIconType.painter(painterResource(R.drawable.ic_empty)),
+            // image = SkyIconType.iconFont("testSkyzanwushuju", "testSky_iconfont"),
+            // imageContent 插槽完全自定义图标区域，优先级高于 image
+            // imageContent = { Icon(Icons.Outlined.Inbox, null, Modifier.size(64.dp), tint = MaterialTheme.colorScheme.outline) },
+            message = message.ifEmpty { "暂无数据" },
+            buttonText = "点击重试",
+            onRetry = { viewModel.load() }
+        )
+    },
+    // 错误态自定义（默认 SkyErrorWidget），message 为 SkyPageState.Error 携带的文案
+    error = { message ->
+        SkyErrorWidget(
+            image = SkyIconType.painter(painterResource(R.drawable.ic_error)),
+            message = message.ifEmpty { "加载失败，请稍后重试" },
+            buttonText = "重新加载",
+            onRetry = { viewModel.load() }
+        )
+    }
+) {
+    // 成功态内容
+    LazyColumn {
+        items(viewModel.datas) { ArticleItem(it) }
     }
 }
 ```
@@ -476,8 +519,8 @@ SkyPageStateLayout(
 ### 占位组件
 
 - `SkyLoadingWidget`：居中转圈
-- `SkyEmptyWidget(message, image, onRetry)`：空数据占位，`onRetry` 对应 `onEmptyRetry`
-- `SkyErrorWidget(message, image, onRetry)`：错误占位，`onRetry` 对应 `onErrorRetry`
+- `SkyEmptyWidget(message, image, imageContent, onRetry)`：空数据占位；`image` 支持 `SkyIconType`（Painter/iconfont，默认 64dp 渲染），`imageContent` 插槽完全自定义图标区域（优先级更高）；`onRetry` 对应 `onEmptyRetry`
+- `SkyErrorWidget(message, image, imageContent, onRetry)`：错误占位，图标参数同上；`onRetry` 对应 `onErrorRetry`
 
 ### 状态说明
 
@@ -648,6 +691,7 @@ SkyIconFont(
 ```
 
 > 图标名称需带前缀（如 `sky-fenxiang`），前缀来自 JSON 的 `css_prefix_text`。
+> 若 glyph 的 `font_class` 本身已含前缀（如 `font_class="testSkytixi"`），解析器不会重复拼接前缀。
 > 若名称不存在，回落渲染红色 `?` 占位，便于排查映射缺失。
 
 ### 动态切换（状态）
@@ -941,16 +985,16 @@ fun SkyNumberKeyBoard(
     confirmDisable: Boolean = false,
     random: Boolean = false,
     showDot: Boolean = true,
-    deleteIcon: SkyKeyBoardIcon? = null,
+    deleteIcon: SkyIconType? = null,
     asBottomSheet: Boolean = true,
     onInput: ((value: String) -> Unit)? = null,
     onDelete: (() -> Unit)? = null,
     onConfirm: (() -> Unit)? = null,
 )
 
-sealed interface SkyKeyBoardIcon {
-    data class Vector(val imageVector: ImageVector) : SkyKeyBoardIcon
-    data class IconFont(val iconName: String, val fontName: String? = null) : SkyKeyBoardIcon
+sealed interface SkyIconType {
+    @Immutable data class PainterIcon(val painter: Painter) : SkyIconType
+    @Immutable data class FontIcon(val iconName: String, val fontName: String? = null) : SkyIconType
 }
 ```
 
@@ -960,7 +1004,7 @@ sealed interface SkyKeyBoardIcon {
 |------|------|
 | `random` | 0-9 全部参与乱序，末位乱序数字落底行（安全键盘场景） |
 | `showDot` | 隐藏后底行数字键占满整行 |
-| `deleteIcon` | 删除键图标；null 用内置 Backspace 矢量图标；`IconFont` 需先经 `SkyIconFontsLib.initRegister` 注册字体 |
+| `deleteIcon` | 删除键图标；null 用内置 Backspace 矢量图标；`FontIcon` 需先经 `SkyIconFontsLib.initRegister` 注册字体 |
 | `confirmModifier` | 确认键修饰符（自定义背景/边框等），作用于按键修饰符链最内层 |
 | `asBottomSheet` | 为 false 时内嵌页面，`state` / `sheetCornerRadius` 不生效 |
 
@@ -996,17 +1040,16 @@ fun SkyRatingBar(
     value: Float = Float.NaN,
     activeColor: Color = Color(0xFFF7BA2A),
     normalColor: Color = Color(0xFFC6D1DE),
-    activeIcon: SkyRatingIcon = SkyRatingIcon.Vector(DefaultStarIcon),
-    normalIcon: SkyRatingIcon = SkyRatingIcon.Vector(DefaultStarIcon),
+    activeIcon: SkyIconType = SkyIconType.PainterIcon(rememberVectorPainter(DefaultStarIcon)),
+    normalIcon: SkyIconType = SkyIconType.PainterIcon(rememberVectorPainter(DefaultStarIcon)),
     allowHalf: Boolean = false,
     readOnly: Boolean = false,
     onChange: (value: Float) -> Unit
 )
 
-sealed interface SkyRatingIcon {
-    data class Vector(val imageVector: ImageVector) : SkyRatingIcon
-    data class Iconfont(val iconName: String, val fontName: String? = null) : SkyRatingIcon
-}
+// 复用公共 SkyIconType（com.sky.widget.iface.SkyIconType）：
+//   @Immutable data class PainterIcon(val painter: Painter) : SkyIconType
+//   @Immutable data class FontIcon(val iconName: String, val fontName: String? = null) : SkyIconType
 ```
 
 ### 关键概念
@@ -1016,7 +1059,7 @@ sealed interface SkyRatingIcon {
 | `value` | 传 `Float.NaN` 时不绘制选中层（仅展示 normal 图标） |
 | `allowHalf` | 0.5 步进，小数部分按百分比裁剪渲染半星 |
 | `readOnly` | 禁用点击与滑动手势（只读展示） |
-| `SkyRatingIcon.Iconfont` | iconfont 图标，需先经 `SkyIconFontsLib.initRegister` 注册字体 |
+| `activeIcon` / `normalIcon` | `PainterIcon` 接收任意 `Painter`（`rememberVectorPainter` 包装 `ImageVector`、`painterResource`、Coil 等）；`FontIcon` 需先经 `SkyIconFontsLib.initRegister` 注册字体 |
 
 ### 基础用法
 
@@ -1310,6 +1353,282 @@ SkySwipeMenu(
 
 ---
 
+## SkyCellLayout（单元格布局）
+
+通用列表项（纯 Compose / Material3）：左侧图标（可选）+ 主标题 / 摘要 + 右侧详情文字 / 箭头（或自定义组件），
+支持底部分割线与点击事件，常用于设置页、个人中心菜单等场景。提供两种重载：
+字符串版（快速使用）与全插槽版（各区域完全自定义）。
+
+### API
+
+```kotlin
+// 字符串版：直接传文字，图标经 SkyIconType 描述
+@Composable
+fun SkyCellLayout(
+    text: String,
+    modifier: Modifier = Modifier,
+    icon: SkyIconType? = null,               // 左侧图标（Painter / iconfont），null 不显示
+    secondaryText: String? = null,           // 主标题下方摘要
+    rightText: String? = null,               // 箭头左侧详情文字
+    showArrow: Boolean = true,               // rightContent 非空时箭头不渲染
+    rightContent: (@Composable () -> Unit)? = null, // 自定义右侧（Switch / 勾选等），优先级高于箭头
+    showDivider: Boolean = false,
+    minHeight: Dp = 56.dp,
+    contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp),
+    backgroundColor: Color = MaterialTheme.colorScheme.surface,
+    textStyle: TextStyle = /* bodyLarge */,
+    secondaryTextStyle: TextStyle = /* bodyMedium */,
+    rightTextStyle: TextStyle = /* bodyMedium */,
+    dividerColor: Color = MaterialTheme.colorScheme.outlineVariant,
+    dividerPadding: PaddingValues = PaddingValues(), // 左右边距可实现内缩分割线
+    onClick: (() -> Unit)? = null,           // null 时不可点击（无涟漪）
+)
+
+// 全插槽版：text 必填，其余区域传 @Composable lambda
+@Composable
+fun SkyCellLayout(
+    text: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+    icon: (@Composable () -> Unit)? = null,
+    secondaryText: (@Composable () -> Unit)? = null,
+    rightText: (@Composable () -> Unit)? = null,
+    rightContent: (@Composable () -> Unit)? = null,
+    showDivider: Boolean = false,
+    dividerColor: Color = MaterialTheme.colorScheme.outlineVariant,
+    dividerPadding: PaddingValues = PaddingValues(),
+)
+```
+
+### 关键概念
+
+| 名称 | 说明 |
+|------|------|
+| `icon` | 字符串版左侧图标，类型为 [SkyIconType](#附录skyicontype统一图标类型)，统一 24dp 尺寸 + 右侧 12dp 间距 |
+| `showArrow` / `rightContent` | 默认右侧为 Canvas 自绘 chevron 箭头（库不依赖 material-icons）；传入 `rightContent` 时箭头不渲染 |
+| `showDivider` | 分割线贴整个 item 底边、贯穿内容宽度（非紧贴文本）；`dividerPadding` 左右边距可实现与主标题对齐的内缩分割线 |
+| `minHeight` | 单元格最小高度，内容超出自动增高 |
+| `onClick` | 为 null 时不可点击、无涟漪效果 |
+
+### 基础用法
+
+```kotlin
+SkyCellLayout(
+    text = "账号与安全",
+    icon = SkyIconType.painter(painterResource(R.drawable.ic_setting)),
+    secondaryText = "管理登录设备",
+    rightText = "已登录",
+    showDivider = true,
+    onClick = { navController.navigate("account") }
+)
+
+// 右侧放 Switch
+var checked by remember { mutableStateOf(false) }
+SkyCellLayout(
+    text = "消息通知",
+    showArrow = false,
+    rightContent = { Switch(checked = checked, onCheckedChange = { checked = it }) }
+)
+```
+
+---
+
+## SkyTabLayout（标签布局）
+
+标签导航组件（纯 Compose）。默认每个 Tab 为「图标 + 文字」样式，支持等分 / 滑动两种排列、
+横向 / 纵向两个方向、基于 [SkyBadgeState](#skybadge徽章) 的角标，以及完全自定义布局。
+传入 `pagerState` 即可与 [SkyViewPage](#skyviewpage分页容器) 零胶水联动。
+
+### API
+
+```kotlin
+enum class SkyTabMode { Fixed, Scrollable }
+
+@Immutable
+class SkyTabItem(
+    val text: String,
+    val icon: SkyIconType? = null,           // 未选中态图标，null 只渲染文字
+    val selectedIcon: SkyIconType? = null,   // 选中态图标，null 回落到 icon
+    val badgeState: SkyBadgeState? = null,   // 复用徽章能力（数字 / 文本 / 圆点）
+    val customContent: (@Composable (selected: Boolean) -> Unit)? = null, // 单 Tab 完全自定义
+)
+
+@Composable
+fun rememberSkyTabStyle(
+    selectedTextColor: Color = Color(0xFFFF5722),
+    unselectedTextColor: Color = Color(0xFF999999),
+    textSize: TextUnit = 12.sp,
+    iconSize: Dp = 24.dp,
+    iconTextSpacing: Dp = 2.dp,
+    itemPadding: PaddingValues = PaddingValues(vertical = 6.dp),
+    itemSpacing: Dp = 28.dp,                 // Scrollable 模式相邻 Tab 间距
+    edgePadding: Dp = 16.dp,                 // Scrollable 模式首尾留白
+    iconTint: Boolean = false,               // 是否用选中/未选中色给图标着色
+    badgeBackgroundColor: Color = Color.Red,
+    badgeTextColor: Color = Color.White,
+    badgeGravity: SkyBadgeGravity = SkyBadgeGravity.TOP_END,
+    badgeOffset: DpOffset = DpOffset(6.dp, (-3).dp),
+): SkyTabStyle
+
+@Composable
+fun SkyTabLayout(
+    tabs: List<SkyTabItem>,
+    modifier: Modifier = Modifier,
+    selectedIndex: Int = 0,                  // 受控；仅 pagerState 为 null 时生效
+    onTabSelected: ((index: Int) -> Unit)? = null,
+    pagerState: SkyViewPageState? = null,    // 传入即联动 SkyViewPage
+    animateToPage: Boolean = true,           // 联动模式点击是否动画翻页
+    mode: SkyTabMode = SkyTabMode.Fixed,
+    orientation: Orientation = Orientation.Horizontal,
+    style: SkyTabStyle = rememberSkyTabStyle(),
+    itemContent: (@Composable (index: Int, tab: SkyTabItem, selected: Boolean) -> Unit)? = null,
+)
+```
+
+### 关键概念
+
+| 名称 | 说明 |
+|------|------|
+| `SkyTabMode.Fixed` | 等分模式：所有 Tab 均分父容器宽/高（类似底部导航栏） |
+| `SkyTabMode.Scrollable` | 滑动模式：Tab 宽度自适应内容，超出可横/纵向滑动，选中项自动滚动到可见区域 |
+| `orientation` | `Horizontal` 横向 / `Vertical` 纵向（侧边栏式导航） |
+| `pagerState` | 传入后进入联动模式：选中索引直接读取分页状态（滑动页面 Tab 自动跟随），点击 Tab 自动翻页；此时 `selectedIndex` 被忽略，`onTabSelected` 作为点击后的附加回调 |
+| `style` | 样式集合，仅作用于默认「图标 + 文字」样式与内置角标；自定义布局不受其影响。构造器 internal，只能经 `rememberSkyTabStyle` 创建 |
+| `iconTint` | 图标自带颜色（如彩色矢量图）时应保持 false |
+| 布局定制优先级 | `SkyTabItem.customContent` > `itemContent` 插槽 > 默认「图标 + 文字」 |
+
+### 基础用法
+
+```kotlin
+// 受控用法
+var selected by remember { mutableIntStateOf(0) }
+val tabs = remember {
+    listOf(
+        SkyTabItem("首页", icon = SkyIconType.iconFont("sky-home")),
+        SkyTabItem("消息", icon = SkyIconType.iconFont("sky-msg"), badgeState = badgeState),
+        SkyTabItem("我的", icon = SkyIconType.iconFont("sky-mine")),
+    )
+}
+SkyTabLayout(tabs = tabs, selectedIndex = selected, onTabSelected = { selected = it })
+
+// 与 SkyViewPage 联动
+val pagerState = rememberSkyViewPageState()
+SkyTabLayout(tabs = tabs, pagerState = pagerState, mode = SkyTabMode.Scrollable)
+SkyViewPage(pageCount = tabs.size, state = pagerState) { /* 各页内容 */ }
+```
+
+---
+
+## SkyPreView（图片预览）
+
+图片预览（基于 Coil + [SkyViewPage](#skyviewpage分页容器) 翻页），黑底全屏，左右滑动切换图片。
+单图即单元素列表，无需区分单图/多图：`models` 支持 Coil 的全部图片源混用（网络 URL、`R.drawable.xxx`、
+`Uri`、`File`、`Bitmap` 等）。每页独立缩放状态，支持双指捏合缩放、双指平移、双击放大/复位；
+未放大时单指横滑翻页，放大后横滑平移图片（复位后方可继续翻页）。
+
+### 依赖
+
+Coil 在库中为 **compileOnly** 依赖（与 Lottie、Paging 一致，不传递给消费者）。使用前需在宿主模块自行导包：
+
+```toml
+coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coilCompose" }
+coil-gif = { group = "io.coil-kt", name = "coil-gif", version.ref = "coilCompose" } # GIF/WebP 动图需要
+```
+
+```kotlin
+// 消费者模块 build.gradle.kts
+implementation(libs.coil.compose)
+implementation(libs.coil.gif) // 仅需静图时可省略
+```
+
+缺失依赖时组件在运行时抛出带导包提示的 `IllegalStateException`。检测到 `coil-gif` 后会自动注册动图解码器，无需手动配置 `ImageLoader`。
+
+### API
+
+```kotlin
+class SkyPreViewState(
+    val minScale: Float = 1f,
+    val maxScale: Float = 5f,
+    val doubleTapScale: Float = 2.5f,
+) { fun reset() }
+
+@Composable
+fun rememberSkyPreViewState(
+    minScale: Float = 1f, maxScale: Float = 5f, doubleTapScale: Float = 2.5f
+): SkyPreViewState
+
+@Composable
+fun SkyPreView(
+    models: List<Any?>,
+    modifier: Modifier = Modifier,
+    initialIndex: Int = 0,
+    pagerState: SkyViewPageState = rememberSkyViewPageState(),
+    minScale: Float = 1f,
+    maxScale: Float = 5f,
+    doubleTapScale: Float = 2.5f,
+    contentScale: ContentScale = ContentScale.Fit,
+    backgroundColor: Color = Color.Black,
+    showIndicator: Boolean = true,
+    indicator: (@Composable (index: Int, count: Int) -> Unit)? = null, // null 用默认 "1/4" 文本
+    closeIcon: SkyIconType? = null,          // null 用默认 Canvas 自绘 X
+    closeIconTint: Color? = Color.White,     // null 不着色
+    onClose: (() -> Unit)? = null,           // 非 null 时右上角显示关闭按钮
+    onPageClick: ((Int) -> Unit)? = null,    // 单击图片（默认无行为，避免误触退出）
+    onPageChanged: ((Int) -> Unit)? = null,
+    onLongClick: ((Int) -> Unit)? = null,
+    loading: (@Composable () -> Unit)? = null, // 默认居中 SkyLoadingWidget
+    error: (@Composable () -> Unit)? = null,   // 默认 SkyErrorWidget
+    imageLoader: ImageLoader? = null,          // null 用 Coil 单例，检测到 coil-gif 自动附带动图解码器
+)
+```
+
+### 关键概念
+
+| 名称 | 说明 |
+|------|------|
+| `models` | 图片源列表（Coil model），单图传单元素列表；支持多种来源混用 |
+| 缩放手势 | 仅放大状态（scale>1）或双指缩放才消费拖拽，scale=1 的单指横滑不消费，事件传递给外层 SkyViewPage 完成翻页 |
+| `indicator` | 页码指示器插槽，入参（当前索引, 总页数）；`showIndicator=false` 关闭 |
+| `onClose` | 非 null 时右上角显示关闭按钮（状态栏内边距自适应）；图标经 `closeIcon`（SkyIconType）定制 |
+| `imageLoader` | 自定义 Coil ImageLoader；null 时用单例并在检测到 coil-gif 时派生带解码器的实例 |
+
+### 基础用法
+
+```kotlin
+var showPreview by remember { mutableStateOf(false) }
+if (showPreview) {
+    SkyPreView(
+        models = listOf("https://.../a.jpg", R.drawable.b, uri),
+        initialIndex = 0,
+        onClose = { showPreview = false },
+        onPageChanged = { index -> /* 记录当前页 */ }
+    )
+}
+```
+
+---
+
+## 附录：SkyIconType（统一图标类型）
+
+多个组件（SkyCellLayout、SkyTabLayout、SkyNumberKeyBoard、SkyRatingBar、SkyPreView 关闭按钮、
+SkyPageStateLayout 的 Empty/Error 图标）统一使用 `SkyIconType` 描述图标，替换早期的
+`SkyKeyBoardIcon`、`SkyRatingIcon`。
+
+```kotlin
+sealed interface SkyIconType {
+    @Immutable data class PainterIcon(val painter: Painter) : SkyIconType          // Painter 图片（资源/矢量/网络）
+    @Immutable data class FontIcon(val iconName: String, val fontName: String? = null) : SkyIconType // iconfont
+
+    companion object {
+        fun painter(painter: Painter): SkyIconType
+        fun iconFont(iconName: String, fontName: String? = null): SkyIconType
+    }
+}
+```
+
+> `FontIcon` 需先在 Application 中调用 `SkyIconFontsLib.initRegister` 注册字体，详见 [SkyIconFont](#skyiconfont图标字体)。
+
+---
+
 ## 附录：库资源前缀
 
 库内字符串 / 颜色资源统一使用前缀 `sky_rl_*`，R 文件路径为 `com.sky.widget.R`。
@@ -1319,7 +1638,7 @@ SkySwipeMenu(
 ## 附录：发布坐标
 
 ```groovy
-implementation "com.sky.lib:SkyWidgetCompose:1.0.6"
+implementation "com.sky.lib:SkyWidgetCompose:1.0.9"
 ```
 
 发布仓库与凭证来自 `local.properties` 中的 `mavenCentral.*` 配置；发布账号与仓库读取账号不同，请勿混用。

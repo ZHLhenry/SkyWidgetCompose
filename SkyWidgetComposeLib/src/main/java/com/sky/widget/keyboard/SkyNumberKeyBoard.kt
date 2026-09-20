@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
@@ -31,6 +32,8 @@ import com.sky.widget.bottomSheet.SkyBottomSheetState
 import com.sky.widget.bottomSheet.SkyBottomSheet
 import com.sky.widget.bottomSheet.rememberBottomSheetState
 import com.sky.widget.iconfont.SkyIconFont
+import com.sky.widget.iface.SkyIconType
+import androidx.compose.foundation.Image
 
 /**
  * @Class: SkyNumberKeyBoard
@@ -63,8 +66,8 @@ import com.sky.widget.iconfont.SkyIconFont
  * @param confirmDisable 是否禁用确认键（降低透明度且不可点击），默认 false
  * @param random 是否随机打乱数字键顺序（0-9 全部参与乱序，安全键盘场景），默认 false
  * @param showDot 是否显示「.」小数点键，默认 true；隐藏后「0」键占满底部整行
- * @param deleteIcon 删除键图标，支持 [SkyKeyBoardIcon.Vector]（矢量图标）与
- * [SkyKeyBoardIcon.IconFont]（iconfont 图标名）两种形式，默认 null 使用内置 Backspace 图标
+ * @param deleteIcon 删除键图标，支持 [SkyIconType.PainterIcon]（[Painter] 图片图标）与
+ * [SkyIconType.FontIcon]（iconfont 图标名）两种形式，默认 null 使用内置 Backspace 图标
  * @param asBottomSheet 是否以 BottomSheet 弹窗形式出现，默认 true；
  * 为 false 时键盘直接内嵌在页面中，此时 [state] 与 [sheetCornerRadius] 参数不生效
  * @param onInput 数字/符号键点击回调，参数为按键值（"0"-"9" 或 "."）
@@ -84,7 +87,7 @@ fun SkyNumberKeyBoard(
     confirmDisable: Boolean = false,
     random: Boolean = false,
     showDot: Boolean = true,
-    deleteIcon: SkyKeyBoardIcon? = null,
+    deleteIcon: SkyIconType? = null,
     asBottomSheet: Boolean = true,
     onInput: ((value: String) -> Unit)? = null,
     onDelete: (() -> Unit)? = null,
@@ -180,13 +183,14 @@ fun SkyNumberKeyBoard(
                                     tint = MaterialTheme.colorScheme.onSurface
                                 )
 
-                                is SkyKeyBoardIcon.Vector -> Icon(
-                                    imageVector = deleteIcon.imageVector,
+                                is SkyIconType.PainterIcon -> Image(
+                                    painter = deleteIcon.painter,
                                     contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurface
+                                    modifier = Modifier.size(24.dp),
+                                    colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onSurface)
                                 )
 
-                                is SkyKeyBoardIcon.IconFont -> SkyIconFont(
+                                is SkyIconType.FontIcon -> SkyIconFont(
                                     iconName = deleteIcon.iconName,
                                     fontName = deleteIcon.fontName,
                                     tint = MaterialTheme.colorScheme.onSurface
@@ -256,27 +260,6 @@ private fun KeyItem(
             style = MaterialTheme.typography.titleLarge
         )
     }
-}
-
-/**
- * 键盘按键图标描述：同时支持矢量图标与 iconfont 图标两种形式
- */
-sealed interface SkyKeyBoardIcon {
-
-    /**
-     * 矢量图标
-     *
-     * @property imageVector 图标矢量数据
-     */
-    data class Vector(val imageVector: ImageVector) : SkyKeyBoardIcon
-
-    /**
-     * iconfont 图标（需先在 Application 中通过 SkyIconFontsLib.initRegister 注册字体）
-     *
-     * @property iconName 图标名（css 前缀 + font_class，如 "skygouxuanzhong"）
-     * @property fontName 可选：指定字体（TTF 文件名，不含 .ttf），不传使用默认字体
-     */
-    data class IconFont(val iconName: String, val fontName: String? = null) : SkyKeyBoardIcon
 }
 
 /**

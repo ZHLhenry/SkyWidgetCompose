@@ -18,6 +18,13 @@ dependencies {
     // 组件内部有运行时检查与导包提示
     compileOnly(libs.androidx.paging.compose)
 
+    // compileOnly：Coil 完全不传递给消费者（编译期 + 运行时都不带），与 Lottie 一致。
+    // 消费者使用 SkyPreView 时需自行导包：implementation(libs.coil.compose)，
+    // GIF/WebP 动图还需 implementation(libs.coil.gif)，组件内部有运行时检查与导包提示；
+    // coil-gif 存在时组件自动注册动图解码器（Class.forName 守卫），消费者无需手动配置 ImageLoader
+    compileOnly(libs.coil.compose)
+    compileOnly(libs.coil.gif)
+
     // CameraX：二维码扫描组件运行时必需
     implementation(libs.androidx.camera.core)
     implementation(libs.androidx.camera.camera2)
