@@ -72,7 +72,13 @@ fun AppRoot() {
             Screen.Grid, Screen.Marquee, Screen.Badge, Screen.IconFont, Screen.Image,
             Screen.QRCode, Screen.RatingBar, Screen.VerifyCode, Screen.NumberKeyBoard,
             Screen.BottomSheet, Screen.ViewPage, Screen.Banner, Screen.SwipeMenu, Screen.TabLayout,
-            Screen.CellLayout, Screen.PreView -> Screen.Home
+            Screen.CellLayout, Screen.PreView, Screen.ChainScrollLayout -> Screen.Home
+            // 联动滚动子示例页：返回联动滚动菜单页
+            Screen.ChainTopSync, Screen.ChainTopContentFirst, Screen.ChainTopAfterContent,
+            Screen.ChainBottomBar, Screen.ChainHorizontalBar, Screen.ChainProgrammatic ->
+                Screen.ChainScrollLayout
+            // 跑马灯子示例页：返回跑马灯菜单页
+            Screen.MarqueeText, Screen.MarqueeView -> Screen.Marquee
             else -> Screen.Refresh
         }
     }
@@ -103,7 +109,12 @@ fun AppRoot() {
         Screen.Signature -> SignatureDemoScreen(onBack = { currentPage = Screen.Home })
         Screen.AnnotatedText -> AnnotatedTextDemoScreen(onBack = { currentPage = Screen.Home })
         Screen.Grid -> GridDemoScreen(onBack = { currentPage = Screen.Home })
-        Screen.Marquee -> MarqueeDemoScreen(onBack = { currentPage = Screen.Home })
+        Screen.Marquee -> MarqueeDemoScreen(
+            onBack = { currentPage = Screen.Home },
+            onNavigate = { currentPage = it }
+        )
+        Screen.MarqueeText -> MarqueeTextDemoScreen(onBack = { currentPage = Screen.Marquee })
+        Screen.MarqueeView -> MarqueeViewDemoScreen(onBack = { currentPage = Screen.Marquee })
         Screen.Badge -> BadgeDemoScreen(onBack = { currentPage = Screen.Home })
         Screen.IconFont -> IconFontDemoScreen(onBack = { currentPage = Screen.Home })
         Screen.Image -> ImageDemoScreen(onBack = { currentPage = Screen.Home })
@@ -118,6 +129,16 @@ fun AppRoot() {
         Screen.TabLayout -> TabLayoutDemoScreen(onBack = { currentPage = Screen.Home })
         Screen.CellLayout -> CellDemoScreen(onBack = { currentPage = Screen.Home })
         Screen.PreView -> PreViewDemoScreen(onBack = { currentPage = Screen.Home })
+        Screen.ChainScrollLayout -> ChainScrollDemoMenuScreen(
+            onBack = { currentPage = Screen.Home },
+            onNavigate = { currentPage = it }
+        )
+        Screen.ChainTopSync -> ChainTopSyncDemoScreen(onBack = { currentPage = Screen.ChainScrollLayout })
+        Screen.ChainTopContentFirst -> ChainTopContentFirstDemoScreen(onBack = { currentPage = Screen.ChainScrollLayout })
+        Screen.ChainTopAfterContent -> ChainTopAfterContentDemoScreen(onBack = { currentPage = Screen.ChainScrollLayout })
+        Screen.ChainBottomBar -> ChainBottomBarDemoScreen(onBack = { currentPage = Screen.ChainScrollLayout })
+        Screen.ChainHorizontalBar -> ChainHorizontalBarDemoScreen(onBack = { currentPage = Screen.ChainScrollLayout })
+        Screen.ChainProgrammatic -> ChainProgrammaticDemoScreen(onBack = { currentPage = Screen.ChainScrollLayout })
     }
 }
 
@@ -145,6 +166,8 @@ sealed interface Screen {
     data object AnnotatedText : Screen
     data object Grid : Screen
     data object Marquee : Screen
+    data object MarqueeText : Screen
+    data object MarqueeView : Screen
     data object Badge : Screen
     data object IconFont : Screen
     data object Image : Screen
@@ -159,6 +182,13 @@ sealed interface Screen {
     data object TabLayout : Screen
     data object CellLayout : Screen
     data object PreView : Screen
+    data object ChainScrollLayout : Screen
+    data object ChainTopSync : Screen
+    data object ChainTopContentFirst : Screen
+    data object ChainTopAfterContent : Screen
+    data object ChainBottomBar : Screen
+    data object ChainHorizontalBar : Screen
+    data object ChainProgrammatic : Screen
 }
 
 /**
@@ -205,6 +235,7 @@ fun HomeScreen(onNavigate: (Screen) -> Unit) {
             ComponentItem("Tab布局", "▤"),            // ▤ 标签页/底部导航
             ComponentItem("单元格", "≣"),            // ≣ 列表项/单元格
             ComponentItem("图片预览", "🔍"),     // 🔍 放大镜/预览
+            ComponentItem("联动滚动", "\uD83D\uDCDC"),      // 📜 联动/折叠滚动
         )
 
         SkyGridLayout(
@@ -242,6 +273,7 @@ fun HomeScreen(onNavigate: (Screen) -> Unit) {
                         "Tab布局" -> onNavigate(Screen.TabLayout)
                         "单元格" -> onNavigate(Screen.CellLayout)
                         "图片预览" -> onNavigate(Screen.PreView)
+                        "联动滚动" -> onNavigate(Screen.ChainScrollLayout)
                     }
                 }
             )

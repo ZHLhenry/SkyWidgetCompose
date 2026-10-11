@@ -15,6 +15,7 @@ SkyWidgetCompose 是一组基于 Jetpack Compose 的通用 UI 组件库，覆盖
 - [SkyPageStateLayout（页面状态布局）](#skypagestatelayout页面状态布局)
 - [SkyAnnotatedText（高亮文本）](#skyannotatedtext高亮文本)
 - [SkyMarqueeView（跑马灯 / 轮播）](#skymarqueeview跑马灯--轮播)
+- [SkyTextMarquee（单行文字跑马灯）](#skytextmarquee单行文字跑马灯)
 - [SkyIconFont（图标字体）](#skyiconfont图标字体)
 - [SkyPercentImage（按比例图片）](#skypercentimage按比例图片)
 - [SkyQRCode（二维码扫描与生成）](#skyqrcode二维码扫描与生成)
@@ -29,6 +30,7 @@ SkyWidgetCompose 是一组基于 Jetpack Compose 的通用 UI 组件库，覆盖
 - [SkyCellLayout（单元格布局）](#skycelllayout单元格布局)
 - [SkyTabLayout（标签布局）](#skytablayout标签布局)
 - [SkyPreView（图片预览）](#skypreview图片预览)
+- [SkyChainScrollLayout（链式联动滚动）](#skychainscrolllayout链式联动滚动)
 
 ---
 
@@ -40,7 +42,7 @@ SkyWidgetCompose 是一组基于 Jetpack Compose 的通用 UI 组件库，覆盖
 
 ```kotlin
 dependencies {
-    implementation("com.sky.lib:SkyWidgetCompose:1.0.9")
+    implementation("com.sky.lib:SkyWidgetCompose:1.1.0")
 }
 ```
 
@@ -626,6 +628,102 @@ state.setCurrentIndex(index, items.size)
 
 - 只有一条数据时不轮播，但仍展示内容
 - `onItemClick` 为 null 时，点击内容暂停 / 继续；传入时派发点击事件不自动暂停
+- 若 `itemContent` 内嵌了溢出的 [SkyTextMarquee](#skytextmarquee单行文字跑马灯)，会等其把长文字完整显示一次（滚到末端并停顿）后再切换下一条，实际切换间隔 = `max(flipInterval, 内层跑马灯首次完整显示时长)`
+
+---
+
+## SkyTextMarquee（单行文字跑马灯）
+
+单个 item 内**一行文字本身**的跑马灯：当文字宽度超出可视容器宽度时自动水平滚动，未超出时不做任何动画，等价普通 `BasicText`。常用于顶部公告栏 / 通知栏。
+
+与 [SkyMarqueeView](#skymarqueeview跑马灯--轮播) 的分工：
+
+- `SkyMarqueeView`：负责「多个 item 之间的切换轮播」（上下左右四方向）；
+- `SkyTextMarquee`：负责「单个 item 内一行文字本身的水平滚动」；
+- 二者可在 `SkyMarqueeView` 的 `itemContent` 插槽内嵌套，得到「item 之间轮播 + item 内长文字继续滚动」的复合效果，并由外层轮播的循环闸门保证长文字先完整显示再切换。
+
+### API
+
+```kotlin
+@Composable
+fun SkyTextMarquee(
+    text: String,
+    modifier: Modifier = Modifier,
+    style: TextStyle = TextStyle(fontSize = 15.sp, color = Color(0xFF333333)),
+    marqueeStyle: SkyTextMarqueeStyle = rememberSkyTextMarqueeStyle(),
+    onClick: (() -> Unit)? = null
+)
+
+@Composable
+fun rememberSkyTextMarqueeStyle(
+    initialDirection: SkyMarqueeDirection = SkyMarqueeDirection.LEFT,
+    initialVelocity: Dp = 40.dp,
+    initialStartDelayMillis: Long = 500L,
+    initialEndPauseMillis: Long = 800L,
+    initialRepeatMode: SkyTextMarqueeRepeatMode = SkyTextMarqueeRepeatMode.Restart,
+    initialGap: Dp = 60.dp
+): SkyTextMarqueeStyle
+
+enum class SkyTextMarqueeRepeatMode { Restart, Reverse, Loop }
+```
+
+### 滚动参数（SkyTextMarqueeStyle，均为可观察字段，直接赋值即时生效）
+
+| 字段 | 说明 |
+|------|------|
+| `direction` | 水平滚动方向，仅 `LEFT` / `RIGHT` 有效；`UP` / `DOWN` 会被忽略并保持静止 |
+| `velocity` | 滚动速度（dp/秒），`<=0` 回落到 1dp/秒下限 |
+| `startDelayMillis` | 每轮滚动前的停顿（毫秒） |
+| `endPauseMillis` | 到达“完整显示”后的停顿（毫秒） |
+| `repeatMode` | 重复模式，见下表 |
+| `gap` | `Loop` 模式下两份文本的水平间距，仅 `Loop` 生效 |
+| `play()` / `pause()` / `toggleFlipping()` / `reset()` | 播放控制；`startFlipping()` / `stopFlipping()` 为与 SkyMarqueeState 对齐的语义别名 |
+
+### 三种重复模式（repeatMode）
+
+| 模式 | 效果 |
+|------|------|
+| `Restart`（默认） | 到达终点停顿后瞬时跳回起点继续滚动，存在可见“跳回” |
+| `Reverse` | 到达终点停顿后原路返回，往返式滚动 |
+| `Loop` | 无缝循环——完整显示停顿后**继续同方向**滚出屏幕，靠主文本一侧再绘制一份相同文本（间距 `gap`）形成首尾相接，无可见跳变，适合顶部公告栏 |
+
+### 基础用法
+
+```kotlin
+val marqueeStyle = rememberSkyTextMarqueeStyle(
+    initialRepeatMode = SkyTextMarqueeRepeatMode.Loop,
+    initialVelocity = 30.dp
+)
+
+SkyTextMarquee(
+    text = "这是一条很长的公告文字，超出容器可视宽度时会自动水平滚动展示",
+    modifier = Modifier.fillMaxWidth(),
+    marqueeStyle = marqueeStyle,
+    onClick = { toast("点击查看公告详情") }
+)
+```
+
+### 与 SkyMarqueeView 嵌套（item 间轮播 + item 内长文字滚动）
+
+```kotlin
+val notices = listOf("公告一：……很长的正文内容", "公告二：……很长的正文内容")
+
+SkyMarqueeView(items = notices, direction = SkyMarqueeDirection.UP) { notice ->
+    SkyTextMarquee(
+        text = notice,
+        modifier = Modifier.fillMaxWidth(),
+        marqueeStyle = rememberSkyTextMarqueeStyle(
+            initialRepeatMode = SkyTextMarqueeRepeatMode.Loop
+        )
+    )
+}
+```
+
+### 关键行为
+
+- 仅当文字实际宽度 > 容器宽度时才真正启动滚动动画；未超限时行为等价普通 `BasicText`。
+- 建议用 `modifier` 限定宽度或使用 `fillMaxWidth()`，以便正确检测溢出。
+- 内部以 `wrapContentWidth(unbounded = true)` 允许文本按自然宽度测量（可超出父容器），交由外层 `clipToBounds` 做可视裁剪，避免“溢出文字不绘制、平移只见空白”。
 
 ---
 
@@ -1607,6 +1705,99 @@ if (showPreview) {
 
 ---
 
+## SkyChainScrollLayout（链式联动滚动）
+
+让"联动条"（如可折叠 AppBar、底部工具栏、侧边栏）与"内容区域"（可滚动列表）共享同一次手势：
+通过标准的 [NestedScrollConnection] 在滚动事件流中拦截位移，按 `mode` 分配给联动条或内容区域，
+实现类似 Material `TopAppBarScrollBehavior` 的折叠 / 展开效果。不依赖具体列表实现，对
+`LazyColumn`、`LazyRow`、`verticalScroll`、`horizontalScroll` 等任何支持嵌套滚动的组件均透明可用。
+
+### API
+
+```kotlin
+@Composable
+fun rememberSkyChainScrollState(
+    minScrollPosition: Dp,          // 最小滚动位置，通常 0.dp（完全展开）
+    maxScrollPosition: Dp,          // 最大滚动位置，通常传联动条高度/宽度（完全隐藏）
+    position: SkyChainScrollPosition = SkyChainScrollPosition.Top,
+    onScrollStop: ((SkyChainScrollState, Float) -> Boolean)? = null, // 返回 true 拦截后续 fling 联动
+): SkyChainScrollState
+
+@Composable
+fun SkyChainScrollLayout(
+    state: SkyChainScrollState,
+    modifier: Modifier = Modifier,
+    mode: SkyChainScrollMode = SkyChainScrollMode.ChainContentFirst,
+    chainContent: @Composable (SkyChainScrollState) -> Unit,          // 联动条（绘制在上层）
+    content: @Composable BoxScope.(SkyChainScrollState) -> Unit,      // 内容区域（需自行留 padding）
+)
+```
+
+`SkyChainScrollState` 读取 / 控制 API：
+
+```kotlin
+fun getScrollPositionValue(): Float          // 当前滚动位置（px，含符号），可直接用于 Modifier.offset
+fun getScrollPositionPercentage(): Float     // 当前折叠比例（0f=完全展开，1f=完全隐藏）
+fun setScrollPosition(value: Float)          // 无动画设置位置（自动钳制）
+suspend fun snapToScrollPosition(value: Float)
+fun setScrollPositionWithAnimate(value: Float) // 有动画设置位置（自动钳制）
+suspend fun animateToScrollPosition(value: Float)
+val minPx: Float                             // 滚动范围下界（px）
+val maxPx: Float                             // 滚动范围上界（px）
+```
+
+### 关键概念
+
+| 名称 | 说明 |
+|------|------|
+| `SkyChainScrollPosition` | 联动条位置：`Top` / `Bottom` / `Start` / `End`，同时决定滑动方向（Top/Bottom 垂直，Start/End 水平） |
+| `SkyChainScrollMode.ChainContentFirst` | **默认**：联动条优先，手势能量先驱动联动条，到边界后再交给内容区域（AppBar 同步跟随） |
+| `SkyChainScrollMode.ContentFirst` | 内容优先，内容滚到边界后剩余位移再驱动联动条；**仅支持 Top / Start** |
+| `SkyChainScrollMode.ChainAfterContent` | 内容完全无法滚动后，才把溢出位移交给联动条 |
+| `chainContent` | 联动条插槽，入参 `SkyChainScrollState`，读取 `getScrollPositionValue()` 驱动平移 / 透明度；绘制在 `content` 上层 |
+| `content` | 内容区域插槽（`BoxScope`），**需自行设置对应方向的 padding** 为联动条让出空间 |
+
+> **滚动范围约定**：`Top` / `Start` 位置初始偏移为 `0`（完全展开），向 `minPx`（负值）滑动即隐藏；
+> `Bottom` / `End` 位置初始偏移为 `maxPx`（完全展开），向 `0` 滑动即隐藏。
+
+### 基础用法（可折叠 AppBar）
+
+```kotlin
+val state = rememberSkyChainScrollState(
+    minScrollPosition = 0.dp,
+    maxScrollPosition = 80.dp,           // AppBar 高度
+    position = SkyChainScrollPosition.Top,
+)
+SkyChainScrollLayout(
+    state = state,
+    modifier = Modifier.fillMaxSize(),
+    mode = SkyChainScrollMode.ChainContentFirst,
+    chainContent = { s ->
+        // 联动条：根据滚动位置整体平移实现折叠
+        AppBar(
+            modifier = Modifier.offset { IntOffset(0, s.getScrollPositionValue().roundToInt()) }
+        )
+    },
+) {
+    // 内容区域：contentPadding 顶部预留 AppBar 高度，避免遮挡
+    LazyColumn(contentPadding = PaddingValues(top = 80.dp)) {
+        items(data) { Item(it) }
+    }
+}
+```
+
+### 代码控制
+
+```kotlin
+// 无动画展开 / 收起（下例基于 Top/Start：0f=完全展开，minPx=完全隐藏）
+state.setScrollPosition(0f)          // Top/Start 完全展开；Bottom/End 则相反（0f 为完全隐藏）
+state.setScrollPosition(state.minPx) // Top/Start 完全隐藏；Bottom/End 的展开态是 maxPx
+// 有动画
+state.setScrollPositionWithAnimate(0f)
+```
+
+---
+
 ## 附录：SkyIconType（统一图标类型）
 
 多个组件（SkyCellLayout、SkyTabLayout、SkyNumberKeyBoard、SkyRatingBar、SkyPreView 关闭按钮、
@@ -1638,7 +1829,7 @@ sealed interface SkyIconType {
 ## 附录：发布坐标
 
 ```groovy
-implementation "com.sky.lib:SkyWidgetCompose:1.0.9"
+implementation "com.sky.lib:SkyWidgetCompose:1.1.0"
 ```
 
 发布仓库与凭证来自 `local.properties` 中的 `mavenCentral.*` 配置；发布账号与仓库读取账号不同，请勿混用。

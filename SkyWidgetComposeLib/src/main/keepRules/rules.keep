@@ -14,6 +14,7 @@
 -keep public class com.sky.widget.banner.** { public *; }
 -keep public class com.sky.widget.bottomSheet.** { public *; }
 -keep public class com.sky.widget.cell.** { public *; }
+-keep public class com.sky.widget.chainScrollLayout.Sky* { public *; }
 -keep public class com.sky.widget.grid.** { public *; }
 -keep public class com.sky.widget.iconfont.** { public *; }
 -keep public class com.sky.widget.iface.** { public *; }

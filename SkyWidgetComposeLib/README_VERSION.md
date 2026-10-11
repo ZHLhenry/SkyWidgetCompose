@@ -1,3 +1,11 @@
+## [v1.1.0] - 2026-09-20
+- 新增 SkyChainScrollLayout（链式联动滚动）：联动条（可折叠 AppBar / 底部工具栏 / 侧边栏）与内容区共享同一次手势，基于 NestedScrollConnection 实现折叠 / 展开，对 LazyColumn/LazyRow/verticalScroll/horizontalScroll 等透明可用
+  - SkyChainScrollPosition 四向（Top/Bottom/Start/End）+ SkyChainScrollMode 三模式（ChainContentFirst 默认 / ContentFirst / ChainAfterContent）；rememberSkyChainScrollState 创建状态，支持读取与代码控制滚动位置
+- 新增 SkyTextMarquee（单行文字跑马灯）：单 item 内一行文字溢出可视宽度时自动水平滚动，未溢出等价普通 BasicText；SkyTextMarqueeStyle 可调方向/速度/停顿/间距并控制播放；三种 repeatMode：Restart（跳回）/ Reverse（往返）/ Loop（无缝循环）
+- SkyMarqueeView 增强：item 内嵌溢出的 SkyTextMarquee 时，外层轮播会等长文字完整显示一次后再切换
+- 示例应用：新增「联动滚动」示例页；跑马灯示例页拆分为菜单页 + SkyMarqueeView / SkyTextMarquee 两个全量 API 子页
+- 同步更新 README_DOC.md（新增 SkyChainScrollLayout、SkyTextMarquee 章节与目录项）
+
 ## [v1.0.9] - 2026-09-20
 - 新增 SkyCellLayout（单元格布局）：纯 Compose/Material3 通用列表项，左图标 + 主标题/摘要 + 右详情/箭头，支持分割线、点击、minHeight；提供字符串版与全插槽版两个重载，右侧箭头 Canvas 自绘（不依赖 material-icons）
 - 新增 SkyTabLayout（标签布局）：SkyTabMode.Fixed 等分 / Scrollable 滑动，横向/纵向排列；复用 SkyBadgeState 角标；传入 pagerState 与 SkyViewPage 零胶水联动（选中自动跟随、点击自动翻页）；样式经 rememberSkyTabStyle 配置，itemContent/customContent 支持完全自定义
